@@ -97,19 +97,29 @@ export const GlossaryPage: React.FC = () => {
         {/* Category Pills */}
         <div className="flex flex-wrap items-center gap-1.5 text-xs">
           <Filter className="w-3.5 h-3.5 text-slate-500 mr-1" />
-          {categories.map((cat) => (
-            <button
-              key={cat}
-              onClick={() => setSelectedCategory(cat)}
-              className={`px-3 py-1.5 rounded-lg font-medium transition-colors ${
-                selectedCategory === cat
-                  ? 'bg-emerald-600 text-white shadow-md'
-                  : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'
-              }`}
-            >
-              {cat === 'All' ? t.glossary.allCategories : cat}
-            </button>
-          ))}
+          {categories.map((cat) => {
+            const label = cat === 'All' 
+              ? t.glossary.allCategories 
+              : cat === 'Mimari & Patterns' && language === 'en' 
+              ? 'Architecture & Patterns' 
+              : cat === 'Performans & DevOps' && language === 'en' 
+              ? 'Performance & DevOps' 
+              : cat;
+
+            return (
+              <button
+                key={cat}
+                onClick={() => setSelectedCategory(cat)}
+                className={`px-3 py-1.5 rounded-lg font-medium transition-colors ${
+                  selectedCategory === cat
+                    ? 'bg-emerald-600 text-white shadow-md'
+                    : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'
+                }`}
+              >
+                {label}
+              </button>
+            );
+          })}
         </div>
       </div>
 

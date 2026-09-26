@@ -3,8 +3,12 @@ import { SIMULATED_ENDPOINTS } from '../data/simulatedEndpoints';
 import { SimulatedEndpoint } from '../types';
 import { Send, Terminal, Database, Code2, CheckCircle2, Clock, Shield } from 'lucide-react';
 import { CodeBlock } from './CodeBlock';
+import { useLanguage } from '../i18n/LanguageContext';
 
 export const RestApiSimulator: React.FC = () => {
+  const { language } = useLanguage();
+  const isTr = language === 'tr';
+
   const [selectedEndpoint, setSelectedEndpoint] = useState<SimulatedEndpoint>(SIMULATED_ENDPOINTS[0]);
   const [activeTab, setActiveTab] = useState<'response' | 'sql' | 'springCode'>('response');
   const [isSending, setIsSending] = useState(false);
@@ -44,10 +48,14 @@ export const RestApiSimulator: React.FC = () => {
           <span className="p-1.5 rounded-lg bg-blue-500/10 text-blue-400 border border-blue-500/20">
             <Terminal className="w-4 h-4" />
           </span>
-          <h3 className="text-lg font-bold text-white">İnteraktif REST API & Hibernate SQL Simülatörü</h3>
+          <h3 className="text-lg font-bold text-white">
+            {isTr ? 'İnteraktif REST API & Hibernate SQL Simülatörü' : 'Interactive REST API & Hibernate SQL Simulator'}
+          </h3>
         </div>
         <p className="text-xs text-slate-400 mt-1">
-          Spring Boot API uçlarına test istekleri atın, üretilen gerçek JSON yanıtlarını, durum kodlarını ve arka planda çalışan Hibernate SQL sorgularını inceleyin.
+          {isTr
+            ? 'Spring Boot API uçlarına test istekleri atın, üretilen gerçek JSON yanıtlarını, durum kodlarını ve arka planda çalışan Hibernate SQL sorgularını inceleyin.'
+            : 'Execute test requests against simulated Spring Boot endpoints; inspect serialized JSON responses, status codes, and underlying Hibernate SQL queries.'}
         </p>
       </div>
 
@@ -55,7 +63,7 @@ export const RestApiSimulator: React.FC = () => {
         {/* Left: Endpoint Selector List */}
         <div className="lg:col-span-4 space-y-2">
           <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider block mb-2">
-            Simüle Edilmiş Uç Noktalar
+            {isTr ? 'Simüle Edilmiş Uç Noktalar' : 'Simulated Endpoints'}
           </label>
           <div className="space-y-1.5">
             {SIMULATED_ENDPOINTS.map((ep) => {
@@ -102,13 +110,13 @@ export const RestApiSimulator: React.FC = () => {
               className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold shadow-lg shadow-emerald-600/30 transition-all active:scale-95 disabled:opacity-50 shrink-0"
             >
               <Send className={`w-3.5 h-3.5 ${isSending ? 'animate-spin' : ''}`} />
-              <span>{isSending ? 'İşleniyor...' : 'Gönder'}</span>
+              <span>{isSending ? (isTr ? 'İşleniyor...' : 'Sending...') : (isTr ? 'Gönder' : 'Send')}</span>
             </button>
           </div>
 
           {/* Description banner */}
           <div className="text-xs text-slate-400 bg-slate-900/60 p-3 rounded-lg border border-slate-800/70">
-            <span className="font-semibold text-slate-300">Açıklama: </span>
+            <span className="font-semibold text-slate-300">{isTr ? 'Açıklama:' : 'Description:'} </span>
             {selectedEndpoint.description}
           </div>
 
@@ -126,7 +134,7 @@ export const RestApiSimulator: React.FC = () => {
                   }`}
                 >
                   <Terminal className="w-3.5 h-3.5" />
-                  <span>JSON Yanıtı</span>
+                  <span>{isTr ? 'JSON Yanıtı' : 'JSON Response'}</span>
                 </button>
 
                 <button
@@ -138,7 +146,7 @@ export const RestApiSimulator: React.FC = () => {
                   }`}
                 >
                   <Database className="w-3.5 h-3.5" />
-                  <span>Hibernate SQL Logları ({selectedEndpoint.sqlQueries.length})</span>
+                  <span>{isTr ? 'Hibernate SQL Logları' : 'Hibernate SQL Logs'} ({selectedEndpoint.sqlQueries.length})</span>
                 </button>
 
                 <button
@@ -150,7 +158,7 @@ export const RestApiSimulator: React.FC = () => {
                   }`}
                 >
                   <Code2 className="w-3.5 h-3.5" />
-                  <span>Spring Controller & Service Kodu</span>
+                  <span>{isTr ? 'Spring Controller & Service Kodu' : 'Spring Controller & Service Code'}</span>
                 </button>
               </div>
 
@@ -178,7 +186,7 @@ export const RestApiSimulator: React.FC = () => {
               {activeTab === 'sql' && (
                 <div className="space-y-3">
                   <div className="text-slate-400 text-xs italic mb-2">
-                    -- Hibernate Show SQL Logları (Hibernate 6 Standardı) --
+                    {isTr ? '-- Hibernate Show SQL Logları (Hibernate 6 Standardı) --' : '-- Hibernate Show SQL Logs (Hibernate 6 Standard) --'}
                   </div>
                   {selectedEndpoint.sqlQueries.map((sql, idx) => (
                     <div
@@ -195,7 +203,7 @@ export const RestApiSimulator: React.FC = () => {
                 <div className="space-y-4">
                   <div>
                     <span className="text-xs font-sans font-semibold text-slate-400 block mb-1">
-                      1. Spring RestController Metodu:
+                      {isTr ? '1. Spring RestController Metodu:' : '1. Spring RestController Method:'}
                     </span>
                     <pre className="text-blue-300 bg-slate-900 p-3 rounded-lg border border-slate-800">
                       {selectedEndpoint.springControllerCode}
@@ -203,7 +211,7 @@ export const RestApiSimulator: React.FC = () => {
                   </div>
                   <div>
                     <span className="text-xs font-sans font-semibold text-slate-400 block mb-1">
-                      2. Spring Service İş Mantığı Metodu:
+                      {isTr ? '2. Spring Service İş Mantığı Metodu:' : '2. Spring Service Business Logic Method:'}
                     </span>
                     <pre className="text-purple-300 bg-slate-900 p-3 rounded-lg border border-slate-800">
                       {selectedEndpoint.springServiceCode}

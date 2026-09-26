@@ -1,12 +1,15 @@
 import React, { useState } from 'react';
 import { Settings, Copy, Check, Sparkles, Layers, Box, CheckSquare, Square } from 'lucide-react';
 import { CodeBlock } from './CodeBlock';
+import { useLanguage } from '../i18n/LanguageContext';
 
 interface DependencyOption {
   id: string;
   name: string;
-  description: string;
-  category: string;
+  descriptionTr: string;
+  descriptionEn: string;
+  categoryTr: string;
+  categoryEn: string;
   groupId: string;
   artifactId: string;
   scope?: string;
@@ -17,8 +20,10 @@ const DEPENDENCIES: DependencyOption[] = [
   {
     id: 'web',
     name: 'Spring Web',
-    description: 'RESTful API\'ler, Spring MVC ve gömülü Apache Tomcat sunucusu içerir.',
-    category: 'Web & API',
+    descriptionTr: 'RESTful API\'ler, Spring MVC ve gömülü Apache Tomcat sunucusu içerir.',
+    descriptionEn: 'Build RESTful APIs with Spring MVC and embedded Apache Tomcat.',
+    categoryTr: 'Web & API',
+    categoryEn: 'Web & API',
     groupId: 'org.springframework.boot',
     artifactId: 'spring-boot-starter-web',
     defaultSelected: true
@@ -26,8 +31,10 @@ const DEPENDENCIES: DependencyOption[] = [
   {
     id: 'jpa',
     name: 'Spring Data JPA',
-    description: 'Hibernate, EntityManager ve Repository desenleriyle veritabanı yönetimi.',
-    category: 'SQL & Veritabanı',
+    descriptionTr: 'Hibernate, EntityManager ve Repository desenleriyle veritabanı yönetimi.',
+    descriptionEn: 'Persist data in SQL stores with Java Persistence API using Spring Data and Hibernate.',
+    categoryTr: 'SQL & Veritabanı',
+    categoryEn: 'SQL & Database',
     groupId: 'org.springframework.boot',
     artifactId: 'spring-boot-starter-data-jpa',
     defaultSelected: true
@@ -35,8 +42,10 @@ const DEPENDENCIES: DependencyOption[] = [
   {
     id: 'postgres',
     name: 'PostgreSQL Driver',
-    description: 'PostgreSQL ilişkisel veritabanı JDBC sürücüsü.',
-    category: 'SQL & Veritabanı',
+    descriptionTr: 'PostgreSQL ilişkisel veritabanı JDBC sürücüsü.',
+    descriptionEn: 'A JDBC and R2DBC driver that allows Java programs to connect to PostgreSQL.',
+    categoryTr: 'SQL & Veritabanı',
+    categoryEn: 'SQL & Database',
     groupId: 'org.postgresql',
     artifactId: 'postgresql',
     scope: 'runtime',
@@ -45,8 +54,10 @@ const DEPENDENCIES: DependencyOption[] = [
   {
     id: 'security',
     name: 'Spring Security',
-    description: 'Kimlik doğrulama, yetkilendirme, CORS ve CSRF koruması.',
-    category: 'Güvenlik',
+    descriptionTr: 'Kimlik doğrulama, yetkilendirme, CORS ve CSRF koruması.',
+    descriptionEn: 'Highly customizable authentication and access-control framework for Spring applications.',
+    categoryTr: 'Güvenlik',
+    categoryEn: 'Security',
     groupId: 'org.springframework.boot',
     artifactId: 'spring-boot-starter-security',
     defaultSelected: true
@@ -54,8 +65,10 @@ const DEPENDENCIES: DependencyOption[] = [
   {
     id: 'validation',
     name: 'Jakarta Validation',
-    description: 'Hibernate Validator ile @NotNull, @Size, @Email girdi denetimleri.',
-    category: 'Doğrulama & Model',
+    descriptionTr: 'Hibernate Validator ile @NotNull, @Size, @Email girdi denetimleri.',
+    descriptionEn: 'Bean Validation with Hibernate Validator supporting @NotNull, @Size, @Email.',
+    categoryTr: 'Doğrulama & Model',
+    categoryEn: 'Validation & Model',
     groupId: 'org.springframework.boot',
     artifactId: 'spring-boot-starter-validation',
     defaultSelected: true
@@ -63,8 +76,10 @@ const DEPENDENCIES: DependencyOption[] = [
   {
     id: 'actuator',
     name: 'Spring Boot Actuator',
-    description: 'Üretim ortamı için sağlık (Health), metrikler ve izleme uçları.',
-    category: 'DevOps & İzleme',
+    descriptionTr: 'Üretim ortamı için sağlık (Health), metrikler ve izleme uçları.',
+    descriptionEn: 'Supports built-in operational endpoints for monitoring, health checks, and metrics.',
+    categoryTr: 'DevOps & İzleme',
+    categoryEn: 'DevOps & Monitoring',
     groupId: 'org.springframework.boot',
     artifactId: 'spring-boot-starter-actuator',
     defaultSelected: false
@@ -72,8 +87,10 @@ const DEPENDENCIES: DependencyOption[] = [
   {
     id: 'lombok',
     name: 'Lombok',
-    description: 'Getter, Setter, Constructor ve Builder kodlarını otomatik üreten kütüphane.',
-    category: 'Geliştirici Araçları',
+    descriptionTr: 'Getter, Setter, Constructor ve Builder kodlarını otomatik üreten kütüphane.',
+    descriptionEn: 'Java annotation library which helps to reduce boilerplate code (getters, builders, constructors).',
+    categoryTr: 'Geliştirici Araçları',
+    categoryEn: 'Developer Tools',
     groupId: 'org.projectlombok',
     artifactId: 'lombok',
     scope: 'provided',
@@ -82,8 +99,10 @@ const DEPENDENCIES: DependencyOption[] = [
   {
     id: 'jjwt',
     name: 'JJWT (Java JWT)',
-    description: 'Stateless REST API\'ler için JSON Web Token oluşturma ve imzalama.',
-    category: 'Güvenlik',
+    descriptionTr: 'Stateless REST API\'ler için JSON Web Token oluşturma ve imzalama.',
+    descriptionEn: 'Java JWT library for signing, parsing, and verifying HMAC and RSA JWT tokens.',
+    categoryTr: 'Güvenlik',
+    categoryEn: 'Security',
     groupId: 'io.jsonwebtoken',
     artifactId: 'jjwt-api',
     defaultSelected: false
@@ -91,6 +110,9 @@ const DEPENDENCIES: DependencyOption[] = [
 ];
 
 export const StarterBuilder: React.FC = () => {
+  const { language } = useLanguage();
+  const isTr = language === 'tr';
+
   const [javaVersion, setJavaVersion] = useState<'21' | '17'>('21');
   const [bootVersion, setBootVersion] = useState<'3.3.4' | '3.2.10'>('3.3.4');
   const [selectedDeps, setSelectedDeps] = useState<string[]>(
@@ -140,7 +162,7 @@ ${depsList
   )
   .join('\n')}
         
-        <!-- Test Dependencies (Otomatik Gelir) -->
+        <!-- Test Dependencies -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-test</artifactId>
@@ -175,28 +197,31 @@ spring:
     name: mastery-service
   threads:
     virtual:
-      enabled: true # Java 21 Virtual Threads desteği
+      enabled: true # Java 21 Virtual Threads
 `;
 
-    if (hasJpa && hasPostgres) {
+    if (hasPostgres && hasJpa) {
       yml += `
   datasource:
-    url: jdbc:postgresql://localhost:5432/masterydb
-    username: \${DB_USERNAME:postgres}
-    password: \${DB_PASSWORD:secret}
+    url: \${DB_URL:jdbc:postgresql://localhost:5432/masterydb}
+    username: \${DB_USER:postgres}
+    password: \${DB_PASS:postgres}
+    driver-class-name: org.postgresql.Driver
     hikari:
-      maximum-pool-size: 15
+      maximum-pool-size: 10
       minimum-idle: 5
+      connection-timeout: 20000
 
   jpa:
     hibernate:
-      ddl-auto: validate # Canlı ortam için validate önerilir
+      ddl-auto: validate
+    open-in-view: false # Prevents DB pool exhaustion
     show-sql: false
-    open-in-view: false # OSIV anti-pattern'ı kapatılır
     properties:
       hibernate:
         format_sql: true
-        default_batch_fetch_size: 25 # N+1 optimizasyonu
+        jdbc:
+          batch_size: 25
 `;
     }
 
@@ -206,7 +231,7 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info,metrics,prometheus
+        include: "health,info,prometheus" # Security Best Practice: Whitelist only
   endpoint:
     health:
       probes:
@@ -218,8 +243,8 @@ management:
       yml += `
 app:
   jwt:
-    secret-key: \${JWT_SECRET:gizliKey123456789012345678901234567890}
-    expiration: 86400000 # 24 saat (ms)
+    secret-key: \${JWT_SECRET:secretKey123456789012345678901234567890}
+    expiration: 86400000 # 24h
 `;
     }
 
@@ -234,10 +259,14 @@ app:
           <span className="p-1.5 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
             <Box className="w-4 h-4" />
           </span>
-          <h3 className="text-lg font-bold text-white">İnteraktif Spring Initializr & Yapılandırma Oluşturucu</h3>
+          <h3 className="text-lg font-bold text-white">
+            {isTr ? 'İnteraktif Spring Initializr & Yapılandırma Oluşturucu' : 'Interactive Spring Initializr & Config Generator'}
+          </h3>
         </div>
         <p className="text-xs text-slate-400 mt-1">
-          Java sürümünüzü ve ihtiyacınız olan Spring Boot bağımlılıklarını seçin; dinamik, optimize edilmiş <code className="text-emerald-400 font-mono">pom.xml</code> ve <code className="text-emerald-400 font-mono">application.yml</code> anında üretilsin.
+          {isTr
+            ? 'Java sürümünüzü ve ihtiyacınız olan Spring Boot bağımlılıklarını seçin; dinamik pom.xml ve application.yml anında üretilsin.'
+            : 'Select your target Java runtime and Spring Boot starters to dynamically generate production-ready pom.xml and application.yml files.'}
         </p>
       </div>
 
@@ -248,12 +277,12 @@ app:
           <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-3">
             <div className="text-xs font-semibold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
               <Settings className="w-3.5 h-3.5 text-emerald-400" />
-              <span>Çalışma Ortamı Ayarları</span>
+              <span>{isTr ? 'Çalışma Ortamı Ayarları' : 'Runtime Environment'}</span>
             </div>
 
             <div className="grid grid-cols-2 gap-3 text-xs">
               <div>
-                <label className="block text-slate-400 mb-1 font-medium">Java Sürümü</label>
+                <label className="block text-slate-400 mb-1 font-medium">{isTr ? 'Java Sürümü' : 'Java Version'}</label>
                 <div className="flex rounded-lg bg-slate-900 p-1 border border-slate-800">
                   <button
                     onClick={() => setJavaVersion('21')}
@@ -275,7 +304,7 @@ app:
               </div>
 
               <div>
-                <label className="block text-slate-400 mb-1 font-medium">Spring Boot Sürümü</label>
+                <label className="block text-slate-400 mb-1 font-medium">{isTr ? 'Spring Boot Sürümü' : 'Boot Version'}</label>
                 <div className="flex rounded-lg bg-slate-900 p-1 border border-slate-800">
                   <button
                     onClick={() => setBootVersion('3.3.4')}
@@ -283,7 +312,7 @@ app:
                       bootVersion === '3.3.4' ? 'bg-emerald-600 text-white' : 'text-slate-400 hover:text-white'
                     }`}
                   >
-                    3.3.4 (En Güncel)
+                    3.3.4 {isTr ? '(Güncel)' : '(Latest)'}
                   </button>
                   <button
                     onClick={() => setBootVersion('3.2.10')}
@@ -302,10 +331,10 @@ app:
           <div>
             <div className="flex items-center justify-between mb-2">
               <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider block">
-                Bağımlılıklar (Starters)
+                {isTr ? 'Bağımlılıklar (Starters)' : 'Dependencies (Starters)'}
               </label>
               <span className="text-[11px] text-emerald-400 font-mono">
-                {selectedDeps.length} Seçili
+                {selectedDeps.length} {isTr ? 'Seçili' : 'Selected'}
               </span>
             </div>
 
@@ -333,10 +362,12 @@ app:
                       <div className="flex items-center gap-2">
                         <span className="text-xs font-bold text-white">{dep.name}</span>
                         <span className="text-[10px] px-1.5 py-0.2 rounded bg-slate-800 text-slate-400 border border-slate-700/60">
-                          {dep.category}
+                          {isTr ? dep.categoryTr : dep.categoryEn}
                         </span>
                       </div>
-                      <p className="text-[11px] text-slate-400 mt-0.5 line-clamp-1">{dep.description}</p>
+                      <p className="text-[11px] text-slate-400 mt-0.5 line-clamp-1">
+                        {isTr ? dep.descriptionTr : dep.descriptionEn}
+                      </p>
                     </div>
                   </button>
                 );
@@ -370,7 +401,7 @@ app:
                 application.yml
               </button>
             </div>
-            <span className="text-xs text-slate-500 font-mono">Dinamik Çıktı</span>
+            <span className="text-xs text-slate-500 font-mono">{isTr ? 'Dinamik Çıktı' : 'Dynamic Output'}</span>
           </div>
 
           <div className="flex-1">

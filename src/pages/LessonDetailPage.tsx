@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { CodeBlock } from '../components/CodeBlock';
 import { MarkdownContent } from '../components/MarkdownContent';
+import { VibeCodingVisualizer } from '../components/VibeCodingVisualizer';
 import { useLanguage } from '../i18n/LanguageContext';
 
 interface LessonDetailPageProps {
@@ -129,6 +130,13 @@ export const LessonDetailPage: React.FC<LessonDetailPageProps> = ({
               {lesson.overview}
             </p>
           </div>
+
+          {/* Special Interactive Visualizer for Module 10 (Vibe Coding) */}
+          {lesson.id === 'module-10-vibe-coding-ai-guardrails' && (
+            <div className="space-y-4">
+              <VibeCodingVisualizer />
+            </div>
+          )}
 
           {/* Sections List */}
           <div className="space-y-12">

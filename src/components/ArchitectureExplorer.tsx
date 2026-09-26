@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { ARCHITECTURE_FILES, ArchitectureFileNode } from '../data/architectureData';
+import React, { useState, useMemo, useEffect } from 'react';
+import { getArchitectureData, ArchitectureFileNode } from '../data/architectureData';
 import { CodeBlock } from './CodeBlock';
 import { 
   Boxes, 
@@ -15,7 +15,13 @@ import { useLanguage } from '../i18n/LanguageContext';
 
 export const ArchitectureExplorer: React.FC = () => {
   const { language } = useLanguage();
-  const [selectedFile, setSelectedFile] = useState<ArchitectureFileNode>(ARCHITECTURE_FILES[0]);
+  const architectureFiles = useMemo(() => getArchitectureData(language), [language]);
+  const [selectedFile, setSelectedFile] = useState<ArchitectureFileNode>(architectureFiles[0]);
+
+  useEffect(() => {
+    const matching = architectureFiles.find(f => f.id === selectedFile.id) || architectureFiles[0];
+    setSelectedFile(matching);
+  }, [language, architectureFiles]);
 
   const getLayerBadgeStyle = (layer: string) => {
     if (layer.includes('Domain')) return 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20';
@@ -112,7 +118,7 @@ export const ArchitectureExplorer: React.FC = () => {
           </div>
 
           <div className="space-y-1.5">
-            {ARCHITECTURE_FILES.map((file) => {
+            {architectureFiles.map((file) => {
               const isSelected = selectedFile.id === file.id;
               return (
                 <button

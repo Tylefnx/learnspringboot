@@ -503,5 +503,192 @@ spring:
     keyTakeaways: [
       'Multi-stage Docker builds reduce image size and attack surfaces drastically.'
     ]
+  },
+  {
+    id: 'module-10-vibe-coding-ai-guardrails',
+    number: 10,
+    title: 'AI-Assisted Spring Boot (Vibe Coding) & Security Guardrails',
+    subtitle: 'LLM Architectural Pitfalls, AOP Proxy Bypass, BOLA/IDOR Vulnerabilities, ArchUnit Rules, and CI/CD Quality Gates',
+    icon: 'Sparkles',
+    category: 'AI & Security Architecture',
+    difficulty: 'Advanced',
+    durationMinutes: 45,
+    overview: 'Deep technical investigation into silent architectural defects and security vulnerabilities produced by LLMs in Spring Boot: AOP proxy bypasses, BOLA authorization flaws, Actuator leaks, ArchUnit deterministic rules, and automated AI PR review mechanisms.',
+    sections: [
+      {
+        id: 'aop-proxy-blindness',
+        title: '1. AOP Proxy Blindness & @Transactional Violations',
+        content: `### Dynamic Proxy Mechanics & The Self-Invocation Trap
+Spring Framework applies \`@Transactional\`, \`@Async\`, and \`@Cacheable\` declarative features via **CGLIB Dynamic Proxies**.
+
+* **Self-Invocation:** Calling an internal \`@Transactional\` method on \`this\` bypasses the proxy container completely. No transaction interceptor runs, and exceptions will **never trigger a rollback**.
+* **Checked Exception Rollback Omission:** Spring TransactionManager only rolls back unchecked exceptions (\`RuntimeException\` and \`Error\`) by default. Methods throwing checked exceptions (\`IOException\`, \`SQLException\`) silently **COMMIT** unless explicitly configured with \`@Transactional(rollbackFor = Exception.class)\`.
+* **Private / Final Method Constraints:** CGLIB proxies cannot override private or final methods, rendering annotations on them completely ineffective.`,
+        codeSnippets: [
+          {
+            title: 'Flawed AI Code vs Production Fix',
+            language: 'java',
+            filename: 'OrderService.java',
+            code: `// ❌ FLAWED AI CODE:
+@Service
+public class OrderService {
+    public void processBatch(List<OrderReq> list) {
+        for (OrderReq req : list) {
+            this.saveOrder(req); // PITFALL: Proxy bypassed! Transaction NEVER starts!
+        }
+    }
+    @Transactional
+    public void saveOrder(OrderReq req) { ... }
+}
+
+// 🟢 PRODUCTION FIX:
+@Service
+@RequiredArgsConstructor
+public class OrderBatchService {
+    private final SingleOrderProcessor singleOrderProcessor; // Dedicated bean
+
+    public void processBatch(List<OrderReq> list) {
+        for (OrderReq req : list) {
+            singleOrderProcessor.saveOrder(req); // Dynamic proxy intercepts and starts TX!
+        }
+    }
+}`
+          }
+        ]
+      },
+      {
+        id: 'jpa-hibernate-vulnerabilities',
+        title: '2. JPA Inefficiencies, N+1 Queries & Direct Entity Exposure',
+        content: `### Persistence Layer & Architectural Decoupling
+1. **N+1 Query Explosion:** Derived queries traversing lazy collections inside loops trigger hundreds of secondary queries. Fix with \`JOIN FETCH\` or DTO constructor projections.
+2. **Open-Session-In-View (OSIV):** Keeping \`spring.jpa.open-in-view=true\` locks database connections until JSON serialization finishes, starving HikariCP connection pools.
+3. **Direct Entity Exposure:** Returning \`@Entity\` models from \`@RestController\` methods leaks sensitive data, causes circular Jackson \`StackOverflowError\` recursion, and enables **Mass Assignment** privilege escalation. Strict DTO records are mandatory.`,
+        codeSnippets: [
+          {
+            title: 'JOIN FETCH & DTO Isolation',
+            language: 'java',
+            filename: 'CustomerRepository.java',
+            code: `public interface CustomerRepository extends JpaRepository<Customer, Long> {
+    // Single query resolution of N+1 relationships
+    @Query("SELECT DISTINCT c FROM Customer c LEFT JOIN FETCH c.orders")
+    List<Customer> findAllWithOrders();
+
+    // DTO Constructor Projection for maximal performance
+    @Query("SELECT new com.mastery.dto.CustomerDto(c.id, c.name, COUNT(o)) " +
+           "FROM Customer c LEFT JOIN c.orders o GROUP BY c.id, c.name")
+    List<CustomerDto> fetchSummaries();
+}`
+          }
+        ]
+      },
+      {
+        id: 'bola-actuator-security',
+        title: '3. Broken Object Level Authorization (BOLA/IDOR) & Actuator Leaks',
+        content: `### Critical Security Deficiencies
+* **BOLA / IDOR (OWASP API #1):** LLMs execute \`findById(id)\` without validating if the authenticated \`Principal\` owns the record, enabling horizontal privilege escalation.
+* **Actuator Endpoint Exposure:** Setting \`management.endpoints.web.exposure.include=*\` exposes \`/actuator/env\` and \`/actuator/heapdump\`, leaking plain-text passwords and cloud credentials.
+* **SpEL and Native SQL Injection:** String concatenation (\`+\`) inside native queries and \`SpelExpressionParser\` evaluations allow Remote Code Execution (RCE).`,
+        codeSnippets: [
+          {
+            title: 'BOLA Guardrail & Secure Actuator Config',
+            language: 'java',
+            filename: 'InvoiceController.java & application.yml',
+            code: `// BOLA Protected Controller:
+@GetMapping("/api/invoices/{id}")
+@PreAuthorize("@securityService.isInvoiceOwner(#id, authentication)")
+public ResponseEntity<InvoiceDto> getInvoice(@PathVariable Long id) {
+    return ResponseEntity.ok(invoiceService.getInvoice(id));
+}
+
+# Production application.yml:
+management:
+  endpoints:
+    web:
+      exposure:
+        include: "health,info,prometheus" # Strictly minimal whitelist!`
+          }
+        ]
+      },
+      {
+        id: 'archunit-deterministic-guardrails',
+        title: '4. ArchUnit Deterministic Architectural Enforcement (CI/CD Gates)',
+        content: `### Unit Testing Your Architectural Integrity
+ArchUnit turns architectural rules into executable Java unit tests in continuous integration:
+
+* **Controllers Must Not Return Entities:** \`controllers_must_not_return_entities\`
+* **Services Must Be Stateless:** \`services_must_be_stateless\` (All service fields must be marked \`final\`).
+* **Layer Isolation:** Controllers must never directly invoke Repository persistence layers.`,
+        codeSnippets: [
+          {
+            title: 'ArchUnit Test Rules',
+            language: 'java',
+            filename: 'ArchitectureRulesTest.java',
+            code: `@AnalyzeClasses(packages = "com.mastery.springboot")
+public class ArchitectureRulesTest {
+
+    @ArchTest
+    public static final ArchRule controllers_must_not_return_entities =
+        methods().that().areDeclaredInClassesThat().resideInAPackage("..controller..")
+        .should().notHaveRawReturnType(resideInAPackage("..entity.."))
+        .because("JPA Entities must not be returned from REST controllers; use DTOs.");
+
+    @ArchTest
+    public static final ArchRule services_must_be_stateless =
+        fields().that().areDeclaredInClassesThat().resideInAPackage("..service..")
+        .and().areNotStatic()
+        .should().beFinal()
+        .because("Spring service beans are singletons and must remain stateless.");
+}`
+          }
+        ]
+      },
+      {
+        id: 'ai-reviewer-threat-modeling',
+        title: '5. AI PR Reviewer & Negative Integration Tests',
+        content: `### Positioning AI as a Security Auditor
+1. **Semantic PR Auditing:** Calibrate LLM reviewer bots in GitHub Actions to specifically detect AOP proxy bypasses and missing rollback declarations.
+2. **Negative Test Synthesis:** Instruct the AI from an attacker's perspective to write \`MockMvc\` tests asserting HTTP 403 Forbidden when unauthorized users attempt cross-tenant resource access.
+3. **Hybrid SAST + LLM Triage:** Feed Semgrep and CodeQL findings into LLMs to automatically filter out false positives and synthesize verified code patches.`,
+        codeSnippets: [
+          {
+            title: 'Negative MockMvc Authorization Test',
+            language: 'java',
+            filename: 'InvoiceSecurityNegativeTest.java',
+            code: `@SpringBootTest
+@AutoConfigureMockMvc
+public class InvoiceSecurityNegativeTest {
+    @Autowired
+    private MockMvc mockMvc;
+
+    @Test
+    @WithMockUser(username = "attacker_bob", roles = "USER")
+    void getInvoice_WhenAccessingOtherUserInvoice_ShouldReturnForbidden() throws Exception {
+        // Attempting to access Alice's invoice ID:
+        mockMvc.perform(get("/api/invoices/101"))
+               .andExpect(status().isForbidden()); // Fails CI build if HTTP 200 is returned!
+    }
+}`
+          }
+        ]
+      }
+    ],
+    bestPractices: [
+      'Never invoke @Transactional or @Async methods internally via this.; delegate to a dedicated bean or TransactionTemplate.',
+      'Always configure @Transactional(rollbackFor = Exception.class) on methods throwing checked exceptions.',
+      'Never return raw JPA @Entity classes from controllers; decouple public contracts with strict DTO records.',
+      'Enforce ArchUnit tests in CI/CD as mandatory quality gates.',
+      'Never expose all actuator endpoints via include: "*"; whitelist only health and info probes.'
+    ],
+    commonPitfalls: [
+      'Self-invocation silently bypassing @Transactional or @Async interceptors.',
+      'Omitting user/tenant ownership filters on findById(id) queries causing BOLA/IDOR.',
+      'Invoking lazy getters inside loops causing N+1 query storms and OSIV connection pool exhaustion.',
+      'Declaring mutable instance variables or thread-unsafe SimpleDateFormat inside singleton services.'
+    ],
+    keyTakeaways: [
+      'Spring Framework dynamic proxy lifecycles operate under different constraints than raw POJO instances.',
+      'AI-generated code quality must be validated through deterministic ArchUnit tests and automated CI/CD guardrails.'
+    ]
   }
 ];
+

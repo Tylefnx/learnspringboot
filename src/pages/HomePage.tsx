@@ -19,7 +19,7 @@ interface HomePageProps {
 }
 
 export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
-  const { t } = useLanguage();
+  const { language, t } = useLanguage();
 
   return (
     <div className="space-y-16 py-8">
@@ -68,11 +68,11 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
             </button>
 
             <button
-              onClick={() => onNavigate('vibe-coding')}
+              onClick={() => onNavigate('lesson-detail', 'module-10-vibe-coding-ai-guardrails')}
               className="flex items-center gap-2 px-6 py-3 rounded-xl bg-slate-900/90 hover:bg-slate-850 text-emerald-300 font-semibold text-sm border border-emerald-500/30 hover:border-emerald-500/60 shadow-lg shadow-emerald-950/40 transition-all hover:scale-105 active:scale-95"
             >
               <Sparkles className="w-4 h-4 text-emerald-400 animate-pulse" />
-              <span>{t.nav.vibeCoding}</span>
+              <span>{t.nav.vibeCoding} ({language === 'en' ? 'Module 10' : 'Modül 10'})</span>
             </button>
           </div>
 
@@ -80,7 +80,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-4 border-t border-slate-800/80">
             <div className="flex items-center gap-2 text-xs text-slate-300">
               <CheckCircle className="w-4 h-4 text-emerald-400 shrink-0" />
-              <span>9 {t.hero.statModules}</span>
+              <span>10 {t.hero.statModules}</span>
             </div>
             <div className="flex items-center gap-2 text-xs text-slate-300">
               <CheckCircle className="w-4 h-4 text-emerald-400 shrink-0" />
@@ -146,21 +146,25 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
           <div className="space-y-2 max-w-2xl">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
               <Sparkles className="w-3.5 h-3.5" />
-              <span>Yapay Zekâ & Güvenlik Raporu (Vibe Coding)</span>
+              <span>{t.nav.vibeCoding} ({language === 'en' ? 'Module 10' : 'Modül 10'})</span>
             </div>
             <h2 className="text-xl sm:text-2xl font-black text-white tracking-tight">
-              LLM'lerin Spring Boot Kod Üretimindeki Mimari & Güvenlik Hataları
+              {language === 'en'
+                ? 'LLM Pitfalls & Security Guardrails in Spring Boot'
+                : 'LLM\'lerin Spring Boot Kod Üretimindeki Mimari & Güvenlik Hataları'}
             </h2>
             <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
-              AOP proxy körlüğü (Self-Invocation), BOLA yetkilendirme açıkları, Actuator sızıntıları ve ArchUnit kuralları ile üretim ortamını güvenceye alın.
+              {language === 'en'
+                ? 'Harden enterprise applications against AOP proxy blindness (self-invocation), BOLA/IDOR vulnerabilities, Actuator exposure, and enforce ArchUnit static rules.'
+                : 'AOP proxy körlüğü (Self-Invocation), BOLA yetkilendirme açıkları, Actuator sızıntıları ve ArchUnit kuralları ile üretim ortamını güvenceye alın.'}
             </p>
           </div>
 
           <button
-            onClick={() => onNavigate('vibe-coding')}
+            onClick={() => onNavigate('lesson-detail', 'module-10-vibe-coding-ai-guardrails')}
             className="flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-bold text-sm shadow-lg shadow-emerald-500/30 transition-all hover:scale-105 active:scale-95 shrink-0"
           >
-            <span>Raporu & İnteraktif Modülü İncele</span>
+            <span>{language === 'en' ? 'Explore Module 10' : '10. Modülü İncele'}</span>
             <ArrowRight className="w-4 h-4" />
           </button>
         </div>

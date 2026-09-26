@@ -1279,9 +1279,196 @@ ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar app.jar"]`
       'Multi-stage Dockerfile hafif, hızlı ve güvenli imajlar üretir.',
       'Graceful shutdown ve doğru pool boyutları kesintisiz hizmet sağlar.'
     ]
+  },
+  {
+    id: 'module-10-vibe-coding-ai-guardrails',
+    number: 10,
+    title: 'Yapay Zekâ ile Kodlama (Vibe Coding) ve Güvenlik Denetimleri',
+    subtitle: 'LLM Mimari Hata Modelleri, AOP Proxy Körlüğü, BOLA/IDOR Zafiyetleri, ArchUnit Kuralları ve CI/CD Kalite Kapıları',
+    icon: 'Sparkles',
+    category: 'AI & Security Architecture',
+    difficulty: 'İleri',
+    durationMinutes: 45,
+    overview: 'Büyük dil modellerinin (LLM) Spring Boot projelerinde ürettiği sessiz mimari ve güvenlik hatalarının teknik incelemesi; AOP proxy atlama tuzakları, BOLA yetkilendirme açıkları, Actuator sızıntıları, ArchUnit deterministik kuralları ve otomatize AI PR reviewer mekanizmaları.',
+    sections: [
+      {
+        id: 'aop-proxy-blindness',
+        title: '1. AOP Proxy Körlüğü ve @Transactional İhlalleri',
+        content: `### Dinamik Proxy Mimarisi ve Self-Invocation Tuzağı
+Spring Framework, \`@Transactional\`, \`@Async\` veya \`@Cacheable\` gibi deklaratif mekanizmaları **CGLIB Dynamic Proxy** katmanı üzerinden işletir.
+
+* **Self-Invocation (Kendi Kendini Çağırma):** Bir servis sınıfı içindeki metodun, aynı sınıftaki \`@Transactional\` metodu \`this.metot()\` şeklinde çağırması proxy katmanını tamamen baypas eder. İşlem (Transaction) **asla başlatılmaz** ve hata anında geri alma (rollback) çalışmaz.
+* **Checked Exception Rollback İhmali:** Spring TransactionManager varsayılan olarak yalnızca \`RuntimeException\` ve \`Error\` fırlatıldığında rollback uygular. \`IOException\` veya \`SQLException\` gibi denetimli istisnalarda işlem sessizce **COMMIT** edilir. Mutlaka \`@Transactional(rollbackFor = Exception.class)\` kullanılmalıdır.
+* **Private / Final Metot Kısıtı:** CGLIB proxy alt sınıflama (subclassing) ile çalıştığı için \`private\` veya \`final\` metotları override edemez. Bu metotlara konan anotasyonlar etkisiz kalır.`,
+        codeSnippets: [
+          {
+            title: 'Kusurlu AI Kodu vs Güvenli Production Çözümü',
+            language: 'java',
+            filename: 'OrderService.java',
+            code: `// ❌ KUSURLU AI KODU:
+@Service
+public class OrderService {
+    public void processBatch(List<OrderReq> list) {
+        for (OrderReq req : list) {
+            this.saveOrder(req); // TUZAK: Proxy baypas edildi! Transaction ÇALIŞMAZ!
+        }
+    }
+    @Transactional
+    public void saveOrder(OrderReq req) { ... }
+}
+
+// 🟢 DOĞRU PRODUCTION ÇÖZÜMÜ:
+@Service
+@RequiredArgsConstructor
+public class OrderBatchService {
+    private final SingleOrderProcessor singleOrderProcessor; // Ayrı bean
+
+    public void processBatch(List<OrderReq> list) {
+        for (OrderReq req : list) {
+            singleOrderProcessor.saveOrder(req); // Proxy devreye girer, TX başlar!
+        }
+    }
+}`
+          }
+        ]
+      },
+      {
+        id: 'jpa-hibernate-vulnerabilities',
+        title: '2. JPA / Hibernate Verimsizlikleri ve Entity İfşası',
+        content: `### Veri Katmanı ve Mimari İzolasyon Tuzakları
+1. **N+1 Sorgu Problemi:** LLM'ler türetilmiş sorgularla lazy ilişkileri döngü içinde çeker. Her alt kayıt için döngüde SQL ateşlenir. Çözüm: \`JOIN FETCH\` veya DTO projection.
+2. **Open-Session-In-View (OSIV):** Modeller \`spring.jpa.open-in-view=true\` bırakarak DB bağlantısını HTTP yanıtı bitene kadar kilitler; bu da HikariCP bağlantı havuzunun tükenmesine yol açar.
+3. **Varlıkların (Entity) Dış Dünyaya Açılması:** \`@RestController\` katmanından doğrudan JPA Entity dönmek; şifre ve token sızıntısına, çift yönlü ilişkilerde \`StackOverflowError\` döngülerine ve **Mass Assignment** (yetki yükseltme) açıklarına neden olur. DTO ayrımı zorunludur.`,
+        codeSnippets: [
+          {
+            title: 'JOIN FETCH ve DTO İzolasyonu',
+            language: 'java',
+            filename: 'CustomerRepository.java',
+            code: `public interface CustomerRepository extends JpaRepository<Customer, Long> {
+    // N+1 sorgusunu tek bir SQL join ile çözer
+    @Query("SELECT DISTINCT c FROM Customer c LEFT JOIN FETCH c.orders")
+    List<Customer> findAllWithOrders();
+
+    // DTO Constructor Expression ile en yüksek performans
+    @Query("SELECT new com.mastery.dto.CustomerDto(c.id, c.name, COUNT(o)) " +
+           "FROM Customer c LEFT JOIN c.orders o GROUP BY c.id, c.name")
+    List<CustomerDto> fetchSummaries();
+}`
+          }
+        ]
+      },
+      {
+        id: 'bola-actuator-security',
+        title: '3. BOLA / IDOR Yetkilendirme Açıkları ve Actuator Sızıntıları',
+        content: `### Kritik Güvenlik Zafiyetleri
+* **BOLA / IDOR (Broken Object Level Authorization):** LLM'ler \`findById(id)\` ile veri çekerken oturum açan kullanıcının o veriye erişim yetkisini (Sahiplik / Tenant Kontrolü) denetlemeyi unutur. Saldırgan sıralı ID taramasıyla başkalarının faturalarını çekebilir.
+* **Actuator Endpoint İfşası:** \`management.endpoints.web.exposure.include=*\` yapılandırması \`/actuator/env\` ve \`/actuator/heapdump\` uç noktalarını dışarı açarak şifrelerin ve AWS API anahtarlarının sızdırılmasına yol açar.
+* **SpEL ve Native SQLi:** Dize birleştirme (\`+\`) ile oluşturulan yerel sorgular ve \`SpelExpressionParser\` doğrudan uzaktan kod yürütme (RCE) saldırılarına zemin hazırlar.`,
+        codeSnippets: [
+          {
+            title: 'BOLA Koruması ve Actuator Yapılandırması',
+            language: 'java',
+            filename: 'InvoiceController.java & application.yml',
+            code: `// BOLA Korumalı Güvenli Controller:
+@GetMapping("/api/invoices/{id}")
+@PreAuthorize("@securityService.isInvoiceOwner(#id, authentication)")
+public ResponseEntity<InvoiceDto> getInvoice(@PathVariable Long id) {
+    return ResponseEntity.ok(invoiceService.getInvoice(id));
+}
+
+# Güvenli application.yml:
+management:
+  endpoints:
+    web:
+      exposure:
+        include: "health,info,prometheus" # Sadece gerekli uç noktalar açık!`
+          }
+        ]
+      },
+      {
+        id: 'archunit-deterministic-guardrails',
+        title: '4. ArchUnit ile Statik Mimari Yaptırımlar (CI/CD Kapısı)',
+        content: `### Mimari Yozlaşmayı Engelleyen Birim Testleri
+ArchUnit kütüphanesi, mimari kuralları Java kodları olarak yazıp CI/CD hattında zorunlu kılar. Yapay zekâ hatalı bir kod yazdığında derleme anında test kırılır:
+
+* **Controller Entity Dönemez:** \`controllers_must_not_return_entities\`
+* **Servisler Durumsuz Olmalıdır:** \`services_must_be_stateless\` (Tüm alanlar \`final\` olmalıdır).
+* **Katman İzolasyonu:** Controller doğrudan Repository katmanına erişemez.`,
+        codeSnippets: [
+          {
+            title: 'ArchUnit Mimari Test Kuralları',
+            language: 'java',
+            filename: 'ArchitectureRulesTest.java',
+            code: `@AnalyzeClasses(packages = "com.mastery.springboot")
+public class ArchitectureRulesTest {
+
+    @ArchTest
+    public static final ArchRule controllers_must_not_return_entities =
+        methods().that().areDeclaredInClassesThat().resideInAPackage("..controller..")
+        .should().notHaveRawReturnType(resideInAPackage("..entity.."))
+        .because("JPA Entity sınıfları dış dünyaya açılamaz; DTO kullanılmalıdır.");
+
+    @ArchTest
+    public static final ArchRule services_must_be_stateless =
+        fields().that().areDeclaredInClassesThat().resideInAPackage("..service..")
+        .and().areNotStatic()
+        .should().beFinal()
+        .because("Spring servisleri singleton'dır; değişken durum barındıramaz.");
+}`
+          }
+        ]
+      },
+      {
+        id: 'ai-reviewer-threat-modeling',
+        title: '5. AI PR Reviewer ve Negatif Entegrasyon Testleri',
+        content: `### Yapay Zekâyı Güvenlik Denetçisi Olarak Konumlandırma
+1. **Semantik PR İnceleme:** GitHub Actions üzerinden çalışan LLM ajanına AOP proxy baypaslarını ve eksik rollback bildirimlerini taratan özel sistem istemleri tanımlanmalıdır.
+2. **Negatif Test Sentezi:** LLM'e saldırgan perspektifi verilerek, \`MockMvc\` ile yetkisiz kullanıcıların başkalarının verilerine eriştiğinde HTTP 403 Forbidden aldığını doğrulayan negatif entegrasyon testleri yazdırılmalıdır.
+3. **SAST + LLM Hibrit Süzgeci:** Semgrep ve CodeQL bulguları LLM ile triyaj edilerek yanlış pozitifler (false positives) elenir.`,
+        codeSnippets: [
+          {
+            title: 'BOLA Saldırı Simülasyonu Negatif Testi',
+            language: 'java',
+            filename: 'InvoiceSecurityNegativeTest.java',
+            code: `@SpringBootTest
+@AutoConfigureMockMvc
+public class InvoiceSecurityNegativeTest {
+    @Autowired
+    private MockMvc mockMvc;
+
+    @Test
+    @WithMockUser(username = "attacker_bob", roles = "USER")
+    void getInvoice_WhenAccessingOtherUserInvoice_ShouldReturnForbidden() throws Exception {
+        // Başka kullanıcının fatura ID'sine erişim denenir:
+        mockMvc.perform(get("/api/invoices/101"))
+               .andExpect(status().isForbidden()); // 200 dönerse CI derlemesi kırılır!
+    }
+}`
+          }
+        ]
+      }
+    ],
+    bestPractices: [
+      '@Transactional metotları asla aynı sınıf içinden (this.) çağırmayın; ayrı bir bean veya TransactionTemplate kullanın.',
+      'Tüm @Transactional metotlarında checked exception\'ları kapsamak için rollbackFor = Exception.class tanımlayın.',
+      'Controller katmanından asla @Entity dönmeyin; DTO ve Record sınıfları ile katı sözleşmeler oluşturun.',
+      'ArchUnit kurallarını CI/CD hattına Quality Gate olarak ekleyin.',
+      'Actuator uç noktalarında include: "*" kullanımını kesinlikle engelleyin; sadece health/info portlarını açın.'
+    ],
+    commonPitfalls: [
+      'Self-invocation nedeniyle @Transactional veya @Async metodunun sessizce devre dışı kalması.',
+      'findById(id) sorgusunda oturum açan kullanıcının sahiplik kontrolünü atlayarak BOLA açığı oluşturmak.',
+      'Döngü içinde lazy getter çağırarak N+1 sorgusu tetiklemek ve OSIV ile HikariCP havuzunu kilitlemek.',
+      'Singleton @Service sınıfları içine değişken (mutable) sınıf değişkenleri veya SimpleDateFormat koymak.'
+    ],
+    keyTakeaways: [
+      'Spring Framework çalışma zamanı dinamik proxy katmanı, POJO nesnelerinden farklı kurallara tabidir.',
+      'Yapay zekâ üretimi kodların güvenliği, ArchUnit mimari testleri ve otomatize CI/CD süzgeçleriyle garantiye alınmalıdır.'
+    ]
   }
 ];
 
 export const getLessonsData = (lang: string = 'tr'): LessonModule[] => {
   return lang === 'en' ? LESSONS_DATA_EN : LESSONS_DATA;
 };
+
