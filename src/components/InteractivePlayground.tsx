@@ -127,7 +127,7 @@ export const InteractivePlayground: React.FC = () => {
   };
 
   const handleCopyDockerCommand = () => {
-    const cmd = `git clone git@github.com:Tylefnx/learnspringboot.git && cd learnspringboot && docker compose up --build -d`;
+    const cmd = `git clone https://github.com/Tylefnx/learnspringboot.git && cd learnspringboot && docker compose up --build -d`;
     navigator.clipboard.writeText(cmd);
     setCopiedDockerCmd(true);
     setTimeout(() => setCopiedDockerCmd(false), 2500);
@@ -275,7 +275,7 @@ export const InteractivePlayground: React.FC = () => {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-xs text-slate-400 font-mono">
               <div className="p-2 rounded-lg bg-slate-900 border border-slate-800">
                 <span className="text-emerald-400 block font-bold mb-0.5">1. Clone:</span>
-                <code>git clone git@github.com:Tylefnx/learnspringboot.git</code>
+                <code>git clone https://github.com/Tylefnx/learnspringboot.git</code>
               </div>
               <div className="p-2 rounded-lg bg-slate-900 border border-slate-800">
                 <span className="text-emerald-400 block font-bold mb-0.5">2. cd:</span>
