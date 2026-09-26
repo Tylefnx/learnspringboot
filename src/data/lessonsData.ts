@@ -1,3 +1,4 @@
+import { LESSONS_DATA_EN } from './lessonsDataEn';
 import { LessonModule } from '../types';
 
 export const LESSONS_DATA: LessonModule[] = [
@@ -1282,85 +1283,5 @@ ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar app.jar"]`
 ];
 
 export const getLessonsData = (lang: string = 'tr'): LessonModule[] => {
-  if (lang === 'en') {
-    return LESSONS_DATA.map(mod => {
-      const enTitles: Record<string, { title: string; subtitle: string; overview: string; category: string; difficulty: 'Beginner' | 'Intermediate' | 'Advanced' }> = {
-        'module-1-spring-boot-basics': {
-          title: 'Spring Boot Fundamentals & Core Architecture',
-          subtitle: 'Differences from Spring Framework, Auto-Configuration, Starters, and Classpath analysis',
-          overview: 'Spring Boot simplifies enterprise Java development. In this module, we dissect Auto-Configuration, Starters, and Jakarta EE 10 / Java 21 standards.',
-          category: 'Core Architecture',
-          difficulty: 'Beginner'
-        },
-        'module-2-ioc-di-beans': {
-          title: 'IoC, Dependency Injection & Bean Lifecycle',
-          subtitle: 'ApplicationContext, Constructor Injection, Bean Scopes, and @Configuration',
-          overview: 'Master Inversion of Control, thread safety in singleton beans, and constructor dependency injection.',
-          category: 'Dependency Injection',
-          difficulty: 'Beginner'
-        },
-        'module-3-data-jpa-hibernate': {
-          title: 'Spring Data JPA, Hibernate 6 & Database Optimization',
-          subtitle: 'Entity mappings, Persistence Context, Dirty Checking, N+1 Query Fixes with EntityGraph',
-          overview: 'Deep dive into Hibernate 6, First-Level Cache, @EntityGraph, JPQL, and Connection Pool tuning.',
-          category: 'Database & ORM',
-          difficulty: 'Intermediate'
-        },
-        'module-4-rest-apis': {
-          title: 'RESTful API Design, RFC 7807 & Global Exception Handling',
-          subtitle: '@RestController, @Valid validation, ProblemDetails, and ResponseEntity',
-          overview: 'Build enterprise-grade REST APIs compliant with RFC 7807 ProblemDetail standards.',
-          category: 'Web & REST',
-          difficulty: 'Intermediate'
-        },
-        'module-5-security-jwt': {
-          title: 'Spring Security 6 & Modern JWT Authentication',
-          subtitle: 'SecurityFilterChain, Stateless Architecture, JJWT 0.12, and Method Security',
-          overview: 'Secure enterprise applications with Spring Security 6, custom SecurityFilterChain, and HMAC-SHA256 JWT tokens.',
-          category: 'Security & Auth',
-          difficulty: 'Advanced'
-        },
-        'module-6-architecture-best-practices': {
-          title: 'Clean Architecture, Hexagonal & Domain-Driven Design',
-          subtitle: 'Separation of concerns, Ports & Adapters, and Rich Domain Models in Spring Boot',
-          overview: 'Apply Clean Architecture with pure Java domain models decoupled from framework dependencies.',
-          category: 'Software Architecture',
-          difficulty: 'Advanced'
-        },
-        'module-7-performance-virtual-threads': {
-          title: 'Java 21 Virtual Threads, Async & Performance Tuning',
-          subtitle: 'Project Loom, HikariCP pool optimization, and @Async thread pools',
-          overview: 'Scale I/O bound workloads effortlessly with Java 21 Virtual Threads and thread pool tuning.',
-          category: 'Performance & Concurrency',
-          difficulty: 'Advanced'
-        },
-        'module-8-testing-quality': {
-          title: 'Unit & Integration Testing (Mockito & Testcontainers)',
-          subtitle: '@SpringBootTest, MockMvc, DataJpaTest, and isolated PostgreSQL containers',
-          overview: 'Write fast unit tests and robust integration tests using MockMvc and Testcontainers.',
-          category: 'Testing & QA',
-          difficulty: 'Intermediate'
-        },
-        'module-9-devops-docker-production': {
-          title: 'Docker Orchestration, Multi-Stage Builds & Actuator',
-          subtitle: 'Multi-stage Dockerfile, JVM container limits, and Spring Boot Actuator health checks',
-          overview: 'Containerize and orchestrate Spring Boot with multi-stage Docker builds and production readiness checks.',
-          category: 'DevOps & Cloud',
-          difficulty: 'Intermediate'
-        }
-      };
-
-      const override = enTitles[mod.id];
-      if (!override) return mod;
-      return {
-        ...mod,
-        title: override.title,
-        subtitle: override.subtitle,
-        overview: override.overview,
-        category: override.category,
-        difficulty: override.difficulty as any
-      };
-    });
-  }
-  return LESSONS_DATA;
+  return lang === 'en' ? LESSONS_DATA_EN : LESSONS_DATA;
 };
