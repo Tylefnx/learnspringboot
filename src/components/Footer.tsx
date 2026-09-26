@@ -22,7 +22,7 @@ export const Footer: React.FC = () => {
             </p>
             <div className="flex items-center gap-2 text-xs text-emerald-400 font-medium pt-1">
               <CheckCircle className="w-3.5 h-3.5" />
-              <span>Netlify & GitHub Pages Ready</span>
+              <span>Docker & Cloud Ready</span>
             </div>
           </div>
 

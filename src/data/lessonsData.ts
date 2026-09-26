@@ -1215,7 +1215,7 @@ class ProductControllerTest {
     id: 'module-10-production-docker-checklist',
     number: 10,
     title: 'Production Checklist, Docker & Deploy Stratejileri',
-    subtitle: 'Multi-stage Dockerfile, JVM Bellek Ayarları, Connection Pool ve Netlify/GitHub Pages Dağıtımı',
+    subtitle: 'Multi-stage Dockerfile, JVM Bellek Ayarları, Connection Pool ve Production Deployment',
     icon: 'Server',
     category: 'DevOps & Deploy',
     difficulty: 'İleri',

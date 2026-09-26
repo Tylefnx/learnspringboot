@@ -43,7 +43,7 @@ export const translations = {
       activeTitle: '🟢 Gerçek Docker Java 21 JVM Derleme & Test Motoru Bağlı',
       activeDesc: 'Kodlarınız doğrudan localhost:8080 üzerinde koşan Java 21 Temurin Spring Boot mikro derleyicisine gönderilir ve izole ortamda derlenip test edilir.',
       inactiveTitle: '⚠️ DİKKAT: Docker Ortamında Değilsiniz (Gerçek Java Derleyicisi Deaktif)',
-      inactiveDesc: 'Şu anda statik bir web ortamındasınız (Netlify/Vercel vb.). Güvenlik ve JVM mimarisi gereği gerçek Java 21 derleyicisi ve Spring Boot konteyneri tarayıcı üzerinde doğrudan çalışamaz. Bu yüzden "Kodu Derle & Test Et" butonu deaktif edilmiştir. Testleri çalıştırmak için projeyi Docker ile başlatmalısınız.',
+      inactiveDesc: 'Şu anda statik bir web ortamındasınız. Güvenlik ve JVM mimarisi gereği gerçek Java 21 derleyicisi ve Spring Boot konteyneri tarayıcı üzerinde doğrudan çalışamaz. Bu yüzden "Kodu Derle & Test Et" butonu deaktif edilmiştir. Testleri çalıştırmak için projeyi Docker ile başlatmalısınız.',
       checkBtn: 'Bağlantıyı Kontrol Et',
       refresh: 'Yenile',
       tutorialTitle: 'Gerçek Java 21 & Spring Boot Derleyicisini Açmak İçin Docker Kurulumu (3 Adım):',
