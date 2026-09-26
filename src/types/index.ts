@@ -1,4 +1,5 @@
-export type DifficultyLevel = 'Başlangıç' | 'Orta' | 'İleri';
+export type Language = 'tr' | 'en';
+export type DifficultyLevel = 'Başlangıç' | 'Orta' | 'İleri' | 'Beginner' | 'Intermediate' | 'Advanced';
 
 export interface CodeSnippet {
   title: string;

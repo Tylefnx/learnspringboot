@@ -222,3 +222,36 @@ public class OpenApiConfig {
 }`
   }
 ];
+
+export const getRecipesData = (lang: string = 'tr'): CodeRecipe[] => {
+  if (lang === 'en') {
+    return RECIPES_DATA.map(recipe => {
+      const enMap: Record<string, Partial<CodeRecipe>> = {
+        'base-auditable-entity': {
+          title: 'Auditable Base Entity (JPA Auditing & Optimistic Locking)',
+          description: 'Reusable mapped superclass automating createdAt, updatedAt, createdBy, and optimistic locking version across all JPA entities.'
+        },
+        'jwt-token-provider': {
+          title: 'Modern JJWT 0.12+ Token Provider Service',
+          description: 'Enterprise HMAC-SHA256 JWT service with claim extraction, token expiration check, and signing key management.'
+        },
+        'rate-limiting-filter': {
+          title: 'Bucket4j In-Memory IP-Based Rate Limiting Filter',
+          description: 'High-performance HTTP filter applying token-bucket rate limiting returning HTTP 429 Too Many Requests upon limit exhaustion.'
+        },
+        'custom-validator': {
+          title: 'Jakarta Validation: Custom PhoneNumber Constraint',
+          description: 'Custom validator implementation using ConstraintValidator and custom annotation for clean domain validations.'
+        }
+      };
+
+      const override = enMap[recipe.id];
+      if (!override) return recipe;
+      return {
+        ...recipe,
+        ...override
+      };
+    });
+  }
+  return RECIPES_DATA;
+};

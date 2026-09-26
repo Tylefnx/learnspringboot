@@ -8,11 +8,10 @@ import {
   Cpu, 
   FileCode, 
   Database, 
-  ArrowRight,
   Server,
-  Sparkles,
   Info
 } from 'lucide-react';
+import { useLanguage } from '../i18n/LanguageContext';
 
 interface FlowStep {
   id: string;
@@ -25,7 +24,7 @@ interface FlowStep {
   codeSnippet: string;
 }
 
-const FLOW_STEPS: FlowStep[] = [
+const FLOW_STEPS_TR: FlowStep[] = [
   {
     id: 'client',
     name: 'HTTP Client',
@@ -60,233 +59,304 @@ filterChain.doFilter(request, response);`
   {
     id: 'dispatcher-servlet',
     name: 'DispatcherServlet',
-    category: 'MVC Çekirdeği',
-    icon: Layers,
+    category: 'Spring MVC Çekirdeği',
+    icon: Cpu,
     title: '3. DispatcherServlet & HandlerMapping',
-    description: 'Spring MVC\'nin kalbi olan DispatcherServlet (Front Controller deseni), isteği karşılar ve hangi Controller metodunun çağrılacağını HandlerMapping ile bulur.',
-    technicalDetails: 'RequestMappingHandlerMapping tablosunu tarar, URL yolu ve HTTP metoduna uyan `@PostMapping("/api/v1/orders")` metodunu tespit eder.',
-    codeSnippet: `// DispatcherServlet.doDispatch(request, response)
+    description: 'Spring MVC\'nin "Front Controller" bileşenidir. Gelen isteği karşılar ve HandlerMapping üzerinden uygun Controller metodunu bulur.',
+    technicalDetails: 'RequestMappingHandlerMapping tablosunda `/api/v1/orders` URL\'ini ve `POST` metodunu eşleştiren OrderController.createOrder() metodunu tespit eder.',
+    codeSnippet: `// DispatcherServlet.java (Spring Framework Core)
 HandlerExecutionChain mappedHandler = getHandler(processedRequest);
 HandlerAdapter ha = getHandlerAdapter(mappedHandler.getHandler());
 ModelAndView mv = ha.handle(processedRequest, response, mappedHandler.getHandler());`
   },
   {
     id: 'controller',
-    name: 'RestController',
+    name: 'RestController & AOP',
     category: 'Web Katmanı',
     icon: FileCode,
-    title: '4. @RestController & Validasyon (@Valid)',
-    description: 'Controller isteği karşılar. Jackson kütüphanesi JSON verisini DTO nesnesine dönüştürür (Deserialization). Jakarta Bean Validation kuralları denetlenir.',
-    technicalDetails: 'Eğer validation hatası varsa @RestControllerAdvice devreye girer. Hata yoksa istek iş mantığı için Service katmanına iletilir.',
-    codeSnippet: `@PostMapping("/orders")
-public ResponseEntity<OrderResponse> createOrder(@Valid @RequestBody CreateOrderRequest req) {
-    OrderResponse res = orderService.createOrder(req);
-    return ResponseEntity.status(HttpStatus.CREATED).body(res);
+    title: '4. RestController, @Valid & AOP Proxies',
+    description: 'HTTP JSON gövdesi nesneye dönüştürülür (HttpMessageConverter), `@Valid` ile doğrulanır ve AOP Aspect (@Transactional, @Around) devreye girer.',
+    technicalDetails: 'Eğer validasyon hatası varsa MethodArgumentNotValidException fırlatılır; aksi halde CGLIB dinamik proxy üzerinden Service katmanına geçilir.',
+    codeSnippet: `@RestController
+@RequestMapping("/api/v1/orders")
+public class OrderController {
+    @PostMapping
+    public ResponseEntity<OrderDto> createOrder(@Valid @RequestBody CreateOrderRequest req) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(orderService.create(req));
+    }
 }`
   },
   {
-    id: 'service',
-    name: 'Service Layer (@Transactional)',
-    category: 'İş Mantığı',
-    icon: Cpu,
-    title: '5. İş Mantığı & Transaction Yönetimi (@Service)',
-    description: 'Tüm iş kuralları, hesaplamalar, yetki kontrolleri ve veritabanı Transaction sınırları (@Transactional) bu katmanda işletilir.',
-    technicalDetails: 'Spring AOP Proxy mekanizması veritabanı transaction\'ını başlatır (BEGIN TRANSACTION). Hata çıkarsa otomatik ROLLBACK yapılır.',
+    id: 'service-tx',
+    name: 'Service & @Transactional',
+    category: 'İş Mantığı & TX',
+    icon: Layers,
+    title: '5. Service Katmanı & Transaction Yönetimi',
+    description: 'İş kuralları işletilir. `@Transactional` proxy\'si EntityManager ile veritabanı transaction\'ı başlatır (BEGIN TRANSACTION).',
+    technicalDetails: 'Spring TransactionInterceptor devreye girer; metot başarılı biterse COMMIT, Unchecked Exception fırlarsa ROLLBACK uygulanır.',
     codeSnippet: `@Service
 public class OrderService {
     @Transactional
-    public OrderResponse createOrder(CreateOrderRequest req) {
-        Product product = productRepository.findById(req.productId())
-            .orElseThrow(() -> new NotFoundException("Ürün bulunamadı"));
-        product.decreaseStock(req.quantity());
-        Order saved = orderRepository.save(new Order(product, req.quantity()));
+    public OrderDto create(CreateOrderRequest req) {
+        // 1. Stok kontrolü
+        // 2. Sipariş Entity oluşturma
+        // 3. repository.save() & Domain Event
         return orderMapper.toDto(saved);
     }
 }`
   },
   {
-    id: 'repository',
-    name: 'Spring Data JPA & Hibernate',
-    category: 'Veri Katmanı',
+    id: 'jpa-db',
+    name: 'JPA, Hibernate & DB',
+    category: 'Veritabanı Katmanı',
     icon: Database,
-    title: '6. JpaRepository & Hibernate ORM',
-    description: 'Entity nesneleri Hibernate Persistence Context (First-level Cache) üzerinde yönetilir ve veritabanı sorguları (SQL) üretilir.',
-    technicalDetails: 'Hibernate, Java Entity nesnelerini ilişkisel veritabanı (RDBMS) tablolarına haritalar ve SQL INSERT/UPDATE komutlarını hazırlar.',
-    codeSnippet: `public interface OrderRepository extends JpaRepository<Order, Long> {
-    // Spring Data JPA dinamik SQL oluşturur
-    List<Order> findByCustomerIdOrderByCreatedAtDesc(Long customerId);
+    title: '6. Hibernate Persistence Context & Veritabanı',
+    description: 'Hibernate nesneyi First-Level Cache\'e alır, Dirty Checking yapar ve HikariCP bağlantı havuzu üzerinden SQL çalıştırır.',
+    technicalDetails: 'HikariDataSource -> PostgreSQL TCP bağlantısı üzerinden `INSERT INTO orders (...) VALUES (...)` SQL sorgusu commit edilir.',
+    codeSnippet: `// Hibernate Generated SQL
+INSERT INTO orders (id, product_id, quantity, created_at) 
+VALUES (nextval('orders_seq'), 42, 2, '2026-09-27 00:00:00+03');
+-- COMMIT TRANSACTION;`
+  }
+];
+
+const FLOW_STEPS_EN: FlowStep[] = [
+  {
+    id: 'client',
+    name: 'HTTP Client',
+    category: 'Client Layer',
+    icon: Server,
+    title: '1. Client Issues Request',
+    description: 'A browser, mobile app, or API client sends an HTTP request (GET, POST, etc.) to the Spring Boot server.',
+    technicalDetails: 'Example: `POST /api/v1/orders HTTP/1.1` carrying JSON body and Authorization: Bearer JWT header.',
+    codeSnippet: `POST /api/v1/orders HTTP/1.1
+Host: api.example.com
+Authorization: Bearer eyJhbGciOiJIUzI1Ni...
+Content-Type: application/json
+
+{ "productId": 42, "quantity": 2 }`
+  },
+  {
+    id: 'filter-chain',
+    name: 'Security Filter Chain',
+    category: 'Filter Layer',
+    icon: ShieldCheck,
+    title: '2. Servlet Filters & Spring Security',
+    description: 'Before reaching the DispatcherServlet, the request traverses the filter chain (CORS, CSRF, JWT Filter).',
+    technicalDetails: 'JwtAuthenticationFilter decodes and verifies the token, populating SecurityContextHolder.',
+    codeSnippet: `// JwtAuthenticationFilter.java
+if (jwtService.isTokenValid(jwt, userDetails)) {
+    UsernamePasswordAuthenticationToken auth = 
+        new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
+    SecurityContextHolder.getContext().setAuthentication(auth);
+}
+filterChain.doFilter(request, response);`
+  },
+  {
+    id: 'dispatcher-servlet',
+    name: 'DispatcherServlet',
+    category: 'Spring MVC Core',
+    icon: Cpu,
+    title: '3. DispatcherServlet & HandlerMapping',
+    description: 'Spring MVC front controller dispatches the request to the matching controller method found in HandlerMapping.',
+    technicalDetails: 'RequestMappingHandlerMapping routes `/api/v1/orders` POST to OrderController.createOrder().',
+    codeSnippet: `// DispatcherServlet.java (Spring Framework Core)
+HandlerExecutionChain mappedHandler = getHandler(processedRequest);
+HandlerAdapter ha = getHandlerAdapter(mappedHandler.getHandler());
+ModelAndView mv = ha.handle(processedRequest, response, mappedHandler.getHandler());`
+  },
+  {
+    id: 'controller',
+    name: 'RestController & AOP',
+    category: 'Web Layer',
+    icon: FileCode,
+    title: '4. RestController, @Valid & AOP Proxies',
+    description: 'JSON is deserialized into Java objects, validated with `@Valid`, and wrapped with AOP aspect interception.',
+    technicalDetails: 'Validation failures throw MethodArgumentNotValidException; otherwise execution delegates to the Service layer.',
+    codeSnippet: `@RestController
+@RequestMapping("/api/v1/orders")
+public class OrderController {
+    @PostMapping
+    public ResponseEntity<OrderDto> createOrder(@Valid @RequestBody CreateOrderRequest req) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(orderService.create(req));
+    }
 }`
   },
   {
-    id: 'database',
-    name: 'Database (RDBMS)',
-    category: 'Kalıcılık',
-    icon: Database,
-    title: '7. Veritabanı İşlemi & Yanıt Dönüşü (Commit & Response)',
-    description: 'HikariCP bağlantı havuzu üzerinden SQL çalıştırılır, transaction COMMIT edilir ve oluşturulan DTO nesnesi JSON olarak istemciye 201 Created ile geri döner.',
-    technicalDetails: 'HTTP 201 Created + Response Body JSON serileştirilerek TCP soketi üzerinden Client\'a aktarılır.',
-    codeSnippet: `HTTP/1.1 201 Created
-Content-Type: application/json
-Location: /api/v1/orders/108
-
-{
-  "orderId": 108,
-  "status": "APPROVED",
-  "total": 599.90,
-  "createdAt": "2026-09-26T23:05:00Z"
+    id: 'service-tx',
+    name: 'Service & @Transactional',
+    category: 'Business & TX',
+    icon: Layers,
+    title: '5. Service Layer & Transaction Boundary',
+    description: 'Business rules execute within an active transaction boundary managed by EntityManager.',
+    technicalDetails: 'TransactionInterceptor executes COMMIT on normal return or ROLLBACK upon uncaught exception.',
+    codeSnippet: `@Service
+public class OrderService {
+    @Transactional
+    public OrderDto create(CreateOrderRequest req) {
+        return orderMapper.toDto(saved);
+    }
 }`
+  },
+  {
+    id: 'jpa-db',
+    name: 'JPA, Hibernate & DB',
+    category: 'Persistence Layer',
+    icon: Database,
+    title: '6. Hibernate Persistence Context & Database',
+    description: 'Hibernate tracks entity in First-Level Cache, executes Dirty Checking, and flushes SQL via HikariCP pool.',
+    technicalDetails: 'PostgreSQL connection receives `INSERT INTO orders (...) VALUES (...)` and commits the transaction.',
+    codeSnippet: `// Hibernate Generated SQL
+INSERT INTO orders (id, product_id, quantity, created_at) 
+VALUES (nextval('orders_seq'), 42, 2, '2026-09-27 00:00:00+03');
+-- COMMIT TRANSACTION;`
   }
 ];
 
 export const LifecycleVisualizer: React.FC = () => {
-  const [currentStepIndex, setCurrentStepIndex] = useState(0);
-  const [isPlaying, setIsPlaying] = useState(false);
+  const { language } = useLanguage();
+  const flowSteps = language === 'en' ? FLOW_STEPS_EN : FLOW_STEPS_TR;
 
-  const step = FLOW_STEPS[currentStepIndex];
+  const [currentStepIndex, setCurrentStepIndex] = useState<number>(0);
+  const activeStep = flowSteps[currentStepIndex];
 
   const handleNext = () => {
-    setCurrentStepIndex((prev) => (prev < FLOW_STEPS.length - 1 ? prev + 1 : 0));
+    if (currentStepIndex < flowSteps.length - 1) {
+      setCurrentStepIndex(prev => prev + 1);
+    }
   };
 
   const handlePrev = () => {
-    setCurrentStepIndex((prev) => (prev > 0 ? prev - 1 : FLOW_STEPS.length - 1));
+    if (currentStepIndex > 0) {
+      setCurrentStepIndex(prev => prev - 1);
+    }
   };
 
   const handleReset = () => {
     setCurrentStepIndex(0);
-    setIsPlaying(false);
-  };
-
-  const toggleAutoPlay = () => {
-    if (isPlaying) {
-      setIsPlaying(false);
-    } else {
-      setIsPlaying(true);
-      let stepIdx = currentStepIndex;
-      const interval = setInterval(() => {
-        stepIdx = (stepIdx + 1) % FLOW_STEPS.length;
-        setCurrentStepIndex(stepIdx);
-        if (stepIdx === FLOW_STEPS.length - 1) {
-          clearInterval(interval);
-          setIsPlaying(false);
-        }
-      }, 2500);
-    }
   };
 
   return (
-    <div className="rounded-2xl border border-slate-800 bg-slate-900/90 shadow-2xl p-6 overflow-hidden">
+    <div className="rounded-2xl border border-slate-800 bg-slate-900/95 shadow-2xl p-6 sm:p-8 space-y-8">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-4 mb-6">
+      <div className="border-b border-slate-800 pb-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <div className="flex items-center gap-2">
-            <span className="p-1.5 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-              <Sparkles className="w-4 h-4" />
+          <div className="flex items-center gap-2.5">
+            <span className="p-2 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 shadow-inner">
+              <Layers className="w-5 h-5" />
             </span>
-            <h3 className="text-lg font-bold text-white">Spring Boot İstek Yaşam Döngüsü Simülatörü</h3>
+            <div>
+              <h2 className="text-xl font-bold text-white">
+                {language === 'en' ? 'Spring MVC HTTP Request Lifecycle Simulator' : 'Spring MVC HTTP İstek Yaşam Döngüsü Simülatörü'}
+              </h2>
+              <p className="text-xs text-slate-400 mt-0.5">
+                {language === 'en' 
+                  ? 'Step-by-step interactive trace from HTTP client to Security Filter, DispatcherServlet, Service, and Hibernate.'
+                  : 'İstemciden veritabanına bir HTTP isteğinin Filter, DispatcherServlet, AOP, Service ve Hibernate adımlarını interaktif inceleyin.'}
+              </p>
+            </div>
           </div>
-          <p className="text-xs text-slate-400 mt-1">
-            Bir HTTP isteğinin istemciden veritabanına ve geri dönüşüne kadar Spring Boot içindeki tüm katman akışı
-          </p>
         </div>
 
-        {/* Action Controls */}
+        {/* Controls */}
         <div className="flex items-center gap-2">
           <button
-            onClick={toggleAutoPlay}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-              isPlaying
-                ? 'bg-amber-500 text-slate-950 hover:bg-amber-400'
-                : 'bg-emerald-500 text-slate-950 hover:bg-emerald-400 shadow-lg shadow-emerald-500/20'
-            }`}
+            onClick={handlePrev}
+            disabled={currentStepIndex === 0}
+            className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 disabled:opacity-40 disabled:pointer-events-none text-xs text-white font-semibold transition-colors"
           >
-            <Play className={`w-3.5 h-3.5 ${isPlaying ? 'fill-slate-950' : ''}`} />
-            <span>{isPlaying ? 'Durdur' : 'Otomatik Oynat'}</span>
+            {language === 'en' ? 'Previous' : 'Önceki'}
           </button>
+
+          <button
+            onClick={handleNext}
+            disabled={currentStepIndex === flowSteps.length - 1}
+            className="flex items-center gap-1.5 px-4 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 disabled:opacity-40 disabled:pointer-events-none text-slate-950 text-xs font-bold transition-all shadow-md shadow-emerald-500/20"
+          >
+            <span>{language === 'en' ? 'Next Step' : 'Sonraki Adım'}</span>
+            <ChevronRight className="w-3.5 h-3.5" />
+          </button>
+
           <button
             onClick={handleReset}
-            className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition-colors"
-            title="Sıfırla"
+            className="p-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition-colors"
+            title={language === 'en' ? 'Reset' : 'Sıfırla'}
           >
-            <RotateCcw className="w-4 h-4" />
+            <RotateCcw className="w-3.5 h-3.5" />
           </button>
         </div>
       </div>
 
-      {/* Progress Nodes Timeline */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2 mb-8">
-        {FLOW_STEPS.map((s, idx) => {
-          const Icon = s.icon;
+      {/* Progress Stepper Bar */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
+        {flowSteps.map((step, idx) => {
+          const Icon = step.icon;
           const isActive = idx === currentStepIndex;
           const isPassed = idx < currentStepIndex;
 
           return (
             <button
-              key={s.id}
+              key={step.id}
               onClick={() => setCurrentStepIndex(idx)}
-              className={`p-2.5 rounded-xl border text-left transition-all duration-200 flex flex-col justify-between ${
+              className={`p-3 rounded-2xl border text-left transition-all relative overflow-hidden flex flex-col justify-between ${
                 isActive
-                  ? 'bg-emerald-950/60 border-emerald-500 text-emerald-300 ring-2 ring-emerald-500/30 shadow-lg'
+                  ? 'bg-emerald-950/40 border-emerald-500/80 shadow-lg shadow-emerald-500/10'
                   : isPassed
-                  ? 'bg-slate-800/80 border-slate-700/80 text-slate-300'
-                  : 'bg-slate-900/40 border-slate-800 text-slate-500 opacity-60 hover:opacity-100'
+                    ? 'bg-slate-900 border-emerald-500/30 text-slate-300'
+                    : 'bg-slate-950/70 border-slate-800 text-slate-500 hover:bg-slate-900/60'
               }`}
             >
-              <div className="flex items-center justify-between w-full mb-1">
-                <span className="text-[10px] font-mono font-bold opacity-70">0{idx + 1}</span>
-                <Icon className={`w-3.5 h-3.5 ${isActive ? 'text-emerald-400' : 'text-slate-400'}`} />
+              <div className="flex items-center justify-between mb-2">
+                <Icon className={`w-4 h-4 ${isActive ? 'text-emerald-400' : isPassed ? 'text-emerald-400/70' : 'text-slate-600'}`} />
+                <span className={`text-[10px] font-mono font-bold ${isActive ? 'text-emerald-400' : 'text-slate-500'}`}>
+                  0{idx + 1}
+                </span>
               </div>
-              <div className="text-xs font-semibold truncate">{s.name}</div>
+              <div className="font-semibold text-xs truncate text-white">{step.name}</div>
+              <div className="text-[10px] text-slate-400 truncate mt-0.5">{step.category}</div>
             </button>
           );
         })}
       </div>
 
-      {/* Detail Active Card */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 bg-slate-950/70 border border-slate-800 rounded-xl p-5">
-        {/* Left: Explanation */}
-        <div className="lg:col-span-6 flex flex-col justify-between space-y-4">
+      {/* Active Step Details Container */}
+      <div className="p-6 sm:p-8 rounded-2xl bg-slate-950 border border-slate-800 space-y-6 animate-in fade-in">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800 pb-4">
           <div>
-            <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-medium bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 mb-2">
-              <Info className="w-3 h-3" />
-              <span>{step.category}</span>
-            </div>
-            <h4 className="text-base font-bold text-white mb-2">{step.title}</h4>
-            <p className="text-sm text-slate-300 leading-relaxed mb-3">{step.description}</p>
-            <div className="p-3 rounded-lg bg-slate-900/90 border border-slate-800/80 text-xs text-slate-400">
-              <span className="font-semibold text-emerald-400 block mb-1">Teknik Detay:</span>
-              {step.technicalDetails}
-            </div>
-          </div>
-
-          {/* Navigation Controls */}
-          <div className="flex items-center justify-between pt-4 border-t border-slate-800/80">
-            <button
-              onClick={handlePrev}
-              className="text-xs px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors"
-            >
-              Önceki Adım
-            </button>
-            <span className="text-xs text-slate-500 font-mono">
-              Adım {currentStepIndex + 1} / {FLOW_STEPS.length}
+            <span className="text-[10px] font-mono font-bold text-emerald-400 uppercase tracking-wider">
+              {language === 'en' ? `Phase 0${currentStepIndex + 1}` : `Aşama 0${currentStepIndex + 1}`} • {activeStep.category}
             </span>
-            <button
-              onClick={handleNext}
-              className="text-xs px-3.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-medium transition-colors flex items-center gap-1"
-            >
-              <span>Sonraki</span>
-              <ChevronRight className="w-3.5 h-3.5" />
-            </button>
+            <h3 className="text-lg sm:text-xl font-bold text-white mt-0.5">
+              {activeStep.title}
+            </h3>
+          </div>
+          <span className="text-xs px-3 py-1 rounded-full bg-slate-800 text-slate-300 border border-slate-700 self-start">
+            {activeStep.name}
+          </span>
+        </div>
+
+        <p className="text-sm text-slate-200 leading-relaxed">
+          {activeStep.description}
+        </p>
+
+        <div className="p-3.5 rounded-xl bg-emerald-950/20 border border-emerald-500/30 text-xs text-emerald-300 flex items-start gap-2.5">
+          <Info className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+          <div>
+            <strong className="block text-emerald-400 font-bold mb-0.5">
+              {language === 'en' ? 'Spring Architecture Deep-Dive:' : 'Spring Mimari Derinliği:'}
+            </strong>
+            <span>{activeStep.technicalDetails}</span>
           </div>
         </div>
 
-        {/* Right: Code Sample */}
-        <div className="lg:col-span-6 bg-slate-900/90 rounded-xl border border-slate-800/90 p-4 font-mono text-xs overflow-x-auto">
-          <div className="flex items-center justify-between border-b border-slate-800 pb-2 mb-3 text-slate-500">
-            <span className="text-emerald-400 font-medium">Spring Boot İç Yapısı / Kod</span>
-            <span>Katman {currentStepIndex + 1}</span>
-          </div>
-          <pre className="text-emerald-300 whitespace-pre leading-relaxed">{step.codeSnippet}</pre>
+        {/* Code Snippet */}
+        <div className="space-y-1.5">
+          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+            {language === 'en' ? 'Code & Protocol Artifact:' : 'Kod & Protokol Örneği:'}
+          </span>
+          <pre className="p-4 rounded-xl bg-slate-900 border border-slate-800 font-mono text-xs text-slate-200 overflow-x-auto leading-relaxed">
+            {activeStep.codeSnippet}
+          </pre>
         </div>
       </div>
     </div>

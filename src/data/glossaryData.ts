@@ -141,3 +141,52 @@ export const GLOSSARY_DATA: GlossaryTerm[] = [
     relatedKeywords: ['JWT', 'Spring Security 6', 'Bearer Token', 'SecurityFilterChain']
   }
 ];
+
+export const getGlossaryData = (lang: string = 'tr'): GlossaryTerm[] => {
+  if (lang === 'en') {
+    return GLOSSARY_DATA.map(term => {
+      const enMap: Record<string, Partial<GlossaryTerm>> = {
+        'ioc': {
+          definition: 'A design principle in which the control of object creation, lifecycle management, and dependency wiring is transferred from the application code to a framework container (Spring ApplicationContext).',
+          inSpringContext: 'In Spring Boot, the IoC Container automatically detects `@Component`, `@Service`, `@Repository` annotations and instantiates managed beans.'
+        },
+        'di': {
+          definition: 'A specialized pattern of Inversion of Control where dependencies are provided to an object (via constructor, setter, or field) rather than the object creating them internally.',
+          inSpringContext: 'Constructor Injection is the strongly recommended approach in modern Spring Boot, ensuring immutability and testability.'
+        },
+        'aop': {
+          definition: 'A programming paradigm that encapsulates cross-cutting concerns (logging, security, transaction management, metrics) without cluttering business logic.',
+          inSpringContext: 'Annotations like `@Transactional`, `@Async`, and `@PreAuthorize` are powered under the hood by Spring AOP dynamic proxies.'
+        },
+        'proxy': {
+          definition: 'A surrogate or wrapper object that intercepts method calls to target beans to apply cross-cutting behavior like transaction boundaries or caching.',
+          inSpringContext: 'Spring Boot uses CGLIB class proxies by default. Direct internal method calls (self-invocation) bypass proxies and will not trigger `@Transactional`.'
+        },
+        'dirty-checking': {
+          definition: 'Hibernate Persistence Context mechanism that automatically detects entity property mutations at commit time and issues appropriate SQL UPDATE statements.',
+          inSpringContext: 'Inside `@Transactional` methods, calling `repository.save()` is redundant when modifying managed entities.'
+        },
+        'first-level-cache': {
+          definition: 'A mandatory, transaction-scoped Hibernate Session cache that deduplicates database queries for the same entity identity within a single transaction.',
+          inSpringContext: 'Guarantees repeatable reads and entity identity equality within a transaction boundary.'
+        },
+        'rfc-7807': {
+          definition: 'An IETF standard defining a standardized JSON structure (Problem Details) for HTTP API error reporting.',
+          inSpringContext: 'Native support in Spring Boot 3 via `ProblemDetail` and `ErrorResponseException` classes.'
+        },
+        'virtual-threads': {
+          definition: 'Lightweight, JVM-managed user-mode threads introduced in Java 21 (Project Loom) enabling massive scalability for I/O bound workloads.',
+          inSpringContext: 'Enabled globally in Spring Boot 3.2+ with a single configuration property: `spring.threads.virtual.enabled=true`.'
+        }
+      };
+
+      const override = enMap[term.id];
+      if (!override) return term;
+      return {
+        ...term,
+        ...override
+      };
+    });
+  }
+  return GLOSSARY_DATA;
+};

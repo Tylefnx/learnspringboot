@@ -685,3 +685,77 @@ public class GlobalExceptionHandler {
     }
   }
 ];
+
+export const getChallengesData = (lang: string = 'tr'): CodingChallenge[] => {
+  if (lang === 'en') {
+    return CODING_CHALLENGES.map(ch => {
+      const enMap: Record<string, Partial<CodingChallenge>> = {
+        'challenge-1-rest-controller': {
+          title: '1. Task: Create First @RestController and @GetMapping Method',
+          difficulty: 'Başlangıç' as any,
+          category: 'Spring MVC & REST',
+          description: 'Create a Spring Boot REST Controller for a greeting service. Return a greeting message in JSON format receiving the "name" query parameter.',
+          instructions: [
+            'Add `@RestController` annotation to GreetingController class.',
+            'Define root path `@RequestMapping("/api/v1")` at class level.',
+            'Annotate method with `@GetMapping("/greet")`.',
+            'Add `@RequestParam` annotation to method parameter (e.g. `@RequestParam(defaultValue = "World") String name`).',
+            'Return `ResponseEntity.ok(Map.of("message", "Hello " + name));` in method body.'
+          ]
+        },
+        'challenge-2-constructor-injection': {
+          title: '2. Task: Clean Service & Constructor Dependency Injection',
+          difficulty: 'Başlangıç' as any,
+          category: 'IoC & Dependency Injection',
+          description: 'Refactor UserService to use Constructor Injection with final fields instead of legacy @Autowired field injection.',
+          instructions: [
+            'Add `@Service` annotation to UserService class.',
+            'Define `private final UserRepository userRepository;` and `private final NotificationService notificationService;`.',
+            'Create explicit constructor injecting both dependencies.'
+          ]
+        },
+        'challenge-3-jpa-entity-repo': {
+          title: '3. Task: JPA Entity & Spring Data Repository Design',
+          difficulty: 'Orta' as any,
+          category: 'Spring Data JPA',
+          description: 'Design a Product entity and custom Spring Data JPA repository query methods.',
+          instructions: [
+            'Add `@Entity` and `@Table(name = "products")` to Product class.',
+            'Define `@Id @GeneratedValue(strategy = GenerationType.IDENTITY) private Long id;`.',
+            'Create ProductRepository extending `JpaRepository<Product, Long>`.',
+            'Declare `List<Product> findByCategoryAndPriceLessThan(String category, BigDecimal price);` query method.'
+          ]
+        },
+        'challenge-4-bean-configuration': {
+          title: '4. Task: Custom @Configuration & @Bean Definition',
+          difficulty: 'Orta' as any,
+          category: 'Spring Core & Beans',
+          description: 'Configure custom third-party beans with @Configuration and conditional loading.',
+          instructions: [
+            'Annotate AppConfig with `@Configuration`.',
+            'Define `@Bean` method returning configured `RestClient` or `ObjectMapper` instance.'
+          ]
+        },
+        'challenge-5-global-exception-handler': {
+          title: '5. Task: RFC 7807 Global Exception Handler (@RestControllerAdvice)',
+          difficulty: 'Orta' as any,
+          category: 'Spring MVC & Exceptions',
+          description: 'Create a centralized exception handler using Spring Boot 3 ProblemDetail standards.',
+          instructions: [
+            'Annotate class with `@RestControllerAdvice`.',
+            'Handle `ResourceNotFoundException.class` using `@ExceptionHandler`.',
+            'Return `ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, ex.getMessage())`.'
+          ]
+        }
+      };
+
+      const override = enMap[ch.id];
+      if (!override) return ch;
+      return {
+        ...ch,
+        ...override
+      };
+    });
+  }
+  return CODING_CHALLENGES;
+};

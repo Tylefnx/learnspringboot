@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { GLOSSARY_DATA, GlossaryTerm } from '../data/glossaryData';
+import { getGlossaryData, GlossaryTerm } from '../data/glossaryData';
 import { CodeBlock } from '../components/CodeBlock';
 import { 
   BookOpen, 
@@ -7,17 +7,19 @@ import {
   Filter, 
   Tag, 
   Sparkles, 
-  Code2, 
   ChevronRight,
-  Layers,
   HelpCircle,
   X
 } from 'lucide-react';
+import { useLanguage } from '../i18n/LanguageContext';
 
 export const GlossaryPage: React.FC = () => {
+  const { language, t } = useLanguage();
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
-  const [expandedTermId, setExpandedTermId] = useState<string | null>(GLOSSARY_DATA[0].id);
+
+  const glossaryData = useMemo(() => getGlossaryData(language), [language]);
+  const [expandedTermId, setExpandedTermId] = useState<string | null>(glossaryData[0]?.id || null);
 
   const categories = [
     'All',
@@ -31,7 +33,7 @@ export const GlossaryPage: React.FC = () => {
 
   const filteredTerms = useMemo(() => {
     const q = searchQuery.toLowerCase().trim();
-    return GLOSSARY_DATA.filter((term) => {
+    return glossaryData.filter((term) => {
       const matchesCategory = selectedCategory === 'All' || term.category === selectedCategory;
       const matchesSearch = !q || 
         term.term.toLowerCase().includes(q) ||
@@ -42,7 +44,7 @@ export const GlossaryPage: React.FC = () => {
 
       return matchesCategory && matchesSearch;
     });
-  }, [searchQuery, selectedCategory]);
+  }, [searchQuery, selectedCategory, glossaryData]);
 
   const toggleExpand = (id: string) => {
     setExpandedTermId(expandedTermId === id ? null : id);
@@ -55,18 +57,18 @@ export const GlossaryPage: React.FC = () => {
         <div>
           <div className="inline-flex items-center gap-2 px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 text-xs font-semibold mb-2 border border-emerald-500/20">
             <BookOpen className="w-3.5 h-3.5" />
-            <span>Kavramlar & Terminoloji Rehberi</span>
+            <span>{t.glossary.badge}</span>
           </div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-white">Spring Boot Türkçe Terim Sözlüğü</h1>
-          <p className="text-xs sm:text-sm text-slate-400 mt-1">
-            IoC, AOP, Dirty Checking, First-Level Cache, Idempotency ve Circuit Breaker gibi tüm temel kavramların derinlemesine açıklamaları.
+          <h1 className="text-2xl sm:text-3xl font-extrabold text-white">{t.glossary.title}</h1>
+          <p className="text-xs sm:text-sm text-slate-400 mt-1 max-w-3xl">
+            {t.glossary.desc}
           </p>
         </div>
 
         {/* Stats */}
         <div className="flex items-center gap-2 text-xs font-mono text-emerald-400 bg-slate-900 px-3 py-1.5 rounded-xl border border-slate-800 shrink-0">
           <Sparkles className="w-3.5 h-3.5" />
-          <span>{GLOSSARY_DATA.length} Terim Tanımlı</span>
+          <span>{glossaryData.length} {t.glossary.countTerms}</span>
         </div>
       </div>
 
@@ -77,7 +79,7 @@ export const GlossaryPage: React.FC = () => {
           <Search className="w-4 h-4 text-emerald-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
           <input
             type="text"
-            placeholder="Terim, İngilizce kısaltma veya anahtar kelime ara (örn: AOP, Dirty Checking, Proxy, Virtual Threads)..."
+            placeholder={t.glossary.searchPlaceholder}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full pl-10 pr-10 py-3 bg-slate-900/90 border border-slate-800 rounded-xl text-xs sm:text-sm text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 transition-colors shadow-inner"
@@ -105,7 +107,7 @@ export const GlossaryPage: React.FC = () => {
                   : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'
               }`}
             >
-              {cat === 'All' ? 'Tüm Kategoriler' : cat}
+              {cat === 'All' ? t.glossary.allCategories : cat}
             </button>
           ))}
         </div>
@@ -115,8 +117,7 @@ export const GlossaryPage: React.FC = () => {
       {filteredTerms.length === 0 ? (
         <div className="text-center py-12 rounded-2xl bg-slate-900/50 border border-slate-800 space-y-2">
           <HelpCircle className="w-8 h-8 text-slate-500 mx-auto" />
-          <h3 className="text-base font-bold text-slate-300">"{searchQuery}" ile eşleşen terim bulunamadı</h3>
-          <p className="text-xs text-slate-500">Farklı bir arama terimi veya kategori deneyin.</p>
+          <h3 className="text-base font-bold text-slate-300">"{searchQuery}" {t.glossary.noResults}</h3>
         </div>
       ) : (
         <div className="space-y-4">
@@ -131,7 +132,7 @@ export const GlossaryPage: React.FC = () => {
                     : 'bg-slate-950/70 border-slate-800 hover:bg-slate-900/60 hover:border-slate-700'
                 }`}
               >
-                {/* Header (Click to toggle) */}
+                {/* Header */}
                 <div
                   onClick={() => toggleExpand(term.id)}
                   className="p-4 sm:p-5 flex items-center justify-between cursor-pointer gap-4"
@@ -163,7 +164,7 @@ export const GlossaryPage: React.FC = () => {
                     {/* Definition */}
                     <div className="space-y-1">
                       <span className="font-bold text-slate-300 uppercase tracking-wider text-[11px]">
-                        Genel Tanım:
+                        {language === 'en' ? 'Definition:' : 'Genel Tanım:'}
                       </span>
                       <p className="text-slate-300 leading-relaxed">{term.definition}</p>
                     </div>
@@ -171,7 +172,7 @@ export const GlossaryPage: React.FC = () => {
                     {/* Spring Context */}
                     <div className="p-3.5 rounded-xl bg-emerald-950/20 border border-emerald-500/30 space-y-1 text-xs">
                       <span className="font-bold text-emerald-400 block uppercase tracking-wider text-[10px]">
-                        Spring Boot Ekosistemindeki Yeri & Önemi:
+                        {language === 'en' ? 'Spring Boot Context & Architecture Role:' : 'Spring Boot Ekosistemindeki Yeri & Önemi:'}
                       </span>
                       <p className="text-slate-200 leading-relaxed">{term.inSpringContext}</p>
                     </div>
@@ -180,7 +181,7 @@ export const GlossaryPage: React.FC = () => {
                     {term.codeExample && (
                       <div className="space-y-1">
                         <span className="font-bold text-slate-400 uppercase tracking-wider text-[10px] block">
-                          Örnek Kod & Kullanım:
+                          {language === 'en' ? 'Code Example:' : 'Örnek Kod & Kullanım:'}
                         </span>
                         <CodeBlock
                           code={term.codeExample}

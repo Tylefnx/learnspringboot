@@ -1,25 +1,32 @@
-import React, { useState } from 'react';
-import { RECIPES_DATA } from '../data/recipesData';
+import React, { useState, useMemo } from 'react';
+import { getRecipesData } from '../data/recipesData';
 import { CodeBlock } from '../components/CodeBlock';
-import { Code2, Filter, Tag, CheckCircle2 } from 'lucide-react';
+import { Code2, Filter, Sparkles } from 'lucide-react';
+import { useLanguage } from '../i18n/LanguageContext';
 
 export const RecipesPage: React.FC = () => {
+  const { language, t } = useLanguage();
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
 
   const categories = ['All', 'Security', 'JPA & DB', 'Architecture & REST', 'Exceptions & Validation'];
+  const recipesData = useMemo(() => getRecipesData(language), [language]);
 
   const filteredRecipes = selectedCategory === 'All'
-    ? RECIPES_DATA
-    : RECIPES_DATA.filter((r) => r.category === selectedCategory);
+    ? recipesData
+    : recipesData.filter((r) => r.category === selectedCategory);
 
   return (
     <div className="space-y-8 py-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-6">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-white">Enterprise Kod Şablonları (Recipes)</h1>
-          <p className="text-xs sm:text-sm text-slate-400 mt-1">
-            Gerçek kurumsal projelerde doğrudan kullanabileceğiniz, temiz kod ve best practice uyumlu Spring Boot şablonları
+          <div className="inline-flex items-center gap-2 px-2.5 py-0.5 rounded-full bg-amber-500/10 text-amber-400 text-xs font-semibold mb-2 border border-amber-500/20">
+            <Sparkles className="w-3.5 h-3.5" />
+            <span>{t.recipes.badge}</span>
+          </div>
+          <h1 className="text-2xl sm:text-3xl font-extrabold text-white">{t.recipes.title}</h1>
+          <p className="text-xs sm:text-sm text-slate-400 mt-1 max-w-3xl">
+            {t.recipes.desc}
           </p>
         </div>
 
@@ -36,7 +43,7 @@ export const RecipesPage: React.FC = () => {
                   : 'text-slate-400 hover:text-white'
               }`}
             >
-              {cat === 'All' ? 'Tümü' : cat}
+              {cat === 'All' ? (language === 'en' ? 'All' : 'Tümü') : cat}
             </button>
           ))}
         </div>

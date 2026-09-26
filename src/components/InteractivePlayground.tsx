@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { CODING_CHALLENGES, CodingChallenge, stripComments } from '../data/challengesData';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { getChallengesData, CodingChallenge, stripComments } from '../data/challengesData';
 import { 
   Play, 
   RotateCcw, 
@@ -19,9 +19,15 @@ import {
   AlertTriangle
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
+import { useLanguage } from '../i18n/LanguageContext';
 
 export const InteractivePlayground: React.FC = () => {
-  const [selectedChallenge, setSelectedChallenge] = useState<CodingChallenge>(CODING_CHALLENGES[0]);
+  const { language, t } = useLanguage();
+  const challenges = useMemo(() => getChallengesData(language), [language]);
+
+  const [selectedChallengeId, setSelectedChallengeId] = useState<string>(challenges[0]?.id || 'challenge-1-rest-controller');
+  const selectedChallenge = challenges.find(c => c.id === selectedChallengeId) || challenges[0];
+
   const [userCode, setUserCode] = useState<string>(selectedChallenge.initialCode);
   const [showSolution, setShowSolution] = useState<boolean>(false);
   const [isCompiling, setIsCompiling] = useState<boolean>(false);
@@ -62,121 +68,74 @@ export const InteractivePlayground: React.FC = () => {
   };
 
   useEffect(() => {
-    checkDockerBackendHealth();
-  }, []);
-
-  const handleSelectChallenge = (challenge: CodingChallenge) => {
-    setSelectedChallenge(challenge);
-    setUserCode(challenge.initialCode);
-    setShowSolution(false);
+    setUserCode(selectedChallenge.initialCode);
     setTestResults(null);
     setTerminalLogs([]);
     setHttpResponse(null);
+    setShowSolution(false);
+  }, [selectedChallengeId]);
+
+  const handleSelectChallenge = (id: string) => {
+    setSelectedChallengeId(id);
   };
 
   const handleResetCode = () => {
     setUserCode(selectedChallenge.initialCode);
-    setShowSolution(false);
     setTestResults(null);
     setTerminalLogs([]);
     setHttpResponse(null);
-  };
-
-  const toggleSolution = () => {
-    if (!showSolution) {
-      setUserCode(selectedChallenge.solutionCode);
-      setShowSolution(true);
-    } else {
-      setUserCode(selectedChallenge.initialCode);
-      setShowSolution(false);
-    }
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === 'Tab') {
-      e.preventDefault();
-      const start = e.currentTarget.selectionStart;
-      const end = e.currentTarget.selectionEnd;
-      const val = userCode;
-      setUserCode(val.substring(0, start) + '    ' + val.substring(end));
-      setTimeout(() => {
-        if (textareaRef.current) {
-          textareaRef.current.selectionStart = textareaRef.current.selectionEnd = start + 4;
-        }
-      }, 0);
-    }
   };
 
   const handleCopyDockerCommand = () => {
-    navigator.clipboard.writeText('git clone https://github.com/r4venward/springboot.git && cd springboot && docker compose up --build -d');
+    const cmd = `git clone git@github.com:Tylefnx/learnspringboot.git\ncd learnspringboot\ndocker compose up --build -d`;
+    navigator.clipboard.writeText(cmd);
     setCopiedDockerCmd(true);
-    setTimeout(() => setCopiedDockerCmd(false), 2000);
+    setTimeout(() => setCopiedDockerCmd(false), 2500);
   };
 
-  const handleRunAndTest = () => {
+  const handleRunCode = async () => {
     setIsCompiling(true);
-    setTerminalLogs([]);
     setTestResults(null);
+    setTerminalLogs([]);
     setHttpResponse(null);
 
-    const now = new Date().toISOString().replace('T', ' ').substring(0, 19);
-
-    // 1. Strip comments before doing any evaluation
-    const cleanCode = stripComments(userCode);
-
-    // 2. Syntax Balance Check (Real Java Syntax Validation)
-    const openBraces = (cleanCode.match(/\{/g) || []).length;
-    const closeBraces = (cleanCode.match(/\}/g) || []).length;
-    const openParens = (cleanCode.match(/\(/g) || []).length;
-    const closeParens = (cleanCode.match(/\)/g) || []).length;
-
-    let syntaxError: string | null = null;
-    if (openBraces !== closeBraces) {
-      syntaxError = `javac Syntax Error: Süslü parantez kapatılmamış ({: ${openBraces}, }: ${closeBraces})`;
-    } else if (openParens !== closeParens) {
-      syntaxError = `javac Syntax Error: Normal parantez uyuşmazlığı ((: ${openParens}, ): ${closeParens})`;
-    }
-
-    const logs = [
-      `[javac] Derleyici başlatılıyor (Java 21 javac)...`,
-      `[javac] ${selectedChallenge.filename} kaynak dosyası taranıyor...`
-    ];
-
-    setTimeout(() => {
-      if (syntaxError) {
-        logs.push(
-          `\x1b[31m[ERROR] ${syntaxError}\x1b[0m`,
-          `[ERROR] Derleme başarısız oldu. (BUILD FAILURE)`
-        );
-        setTerminalLogs(logs);
-        setTestResults(selectedChallenge.testCheckers.map((c) => ({ 
-          passed: false, 
-          message: `✖ ${c.validate(cleanCode, userCode).error}` 
-        })));
-        setIsCompiling(false);
+    // If in Docker JVM mode and backend is offline, warn user
+    if (executionEngine === 'docker-jvm') {
+      await checkDockerBackendHealth();
+      if (!isDockerBackendOnline) {
+        setTimeout(() => {
+          setIsCompiling(false);
+          setTerminalLogs([
+            `\x1b[31m[ERROR] Docker Spring Boot JVM Sunucusuna (http://localhost:8080) ulaşılamadı!\x1b[0m`,
+            `[HINT] Lütfen terminalinizde 'docker compose up --build -d' komutunu çalıştırdığınızdan emin olun.`,
+            `[INFO] Tarayıcı içi AST motoruna geçerek testlerinizi internet üzerinden de koşturabilirsiniz.`
+          ]);
+        }, 300);
         return;
       }
+    }
 
-      // Run test checkers against clean code
+    // Client-side AST and Rule Validation
+    setTimeout(() => {
+      const cleanCode = stripComments(userCode);
       const results: { passed: boolean; message: string }[] = [];
-      let allPassed = true;
 
       for (const checker of selectedChallenge.testCheckers) {
         const checkResult = checker.validate(cleanCode, userCode);
         results.push({
           passed: checkResult.passed,
-          message: checkResult.passed ? `✔ ${checker.description}` : `✖ ${checkResult.error}`
+          message: checkResult.passed ? checker.description : (checkResult.error || checker.description)
         });
-        if (!checkResult.passed) {
-          allPassed = false;
-        }
       }
 
       setTestResults(results);
 
+      const allPassed = results.every((r) => r.passed);
+      const logs: string[] = [];
+      const now = new Date().toISOString().substring(11, 19);
+
       if (allPassed) {
         logs.push(
-          `[javac] Derleme başarılı (0 hata).`,
           `\x1b[32m  .   ____          _            __ _ _\x1b[0m`,
           `\x1b[32m /\\\\ / ___'_ __ _ _(_)_ __  __ _ \\ \\ \\ \\\x1b[0m`,
           `\x1b[32m( ( )\\___ | '_ | '_| | '_ \\/ _\` | \\ \\ \\ \\\x1b[0m`,
@@ -190,7 +149,7 @@ export const InteractivePlayground: React.FC = () => {
           `${now} [main] INFO  o.s.w.s.DispatcherServlet - Initializing Servlet 'dispatcherServlet'`,
           `${now} [http-nio-8080-exec-1] INFO  o.s.web.servlet.mvc.method - Mapped [${selectedChallenge.simulatedEndpoint.method} ${selectedChallenge.simulatedEndpoint.path}] onto controller method.`,
           `${now} [http-nio-8080-exec-1] INFO  c.e.m.TestRunner - HTTP 200 OK Response generated.`,
-          `\x1b[32m>> TÜM TESTLER BAŞARIYLA GEÇTİ! (TEST PASS) <<\x1b[0m`
+          `\x1b[32m>> ALL TESTS PASSED SUCCESSFULLY! (TEST PASS) <<\x1b[0m`
         );
         setHttpResponse(selectedChallenge.simulatedEndpoint.successBody);
         confetti({
@@ -201,9 +160,9 @@ export const InteractivePlayground: React.FC = () => {
       } else {
         const failedChecks = results.filter((r) => !r.passed);
         logs.push(
-          `\x1b[31m[ERROR] Test doğrulaması başarısız! Eksik veya hatalı kod tespit edildi:\x1b[0m`,
+          `\x1b[31m[ERROR] Validation failed! Missing or invalid code detected:\x1b[0m`,
           ...failedChecks.map((fc) => `  -> ${fc.message}`),
-          `[WARN] İpucu: Yukarıdaki talimatları kontrol edip kodunuzu tamamlayın veya 'Çözümü Gör' butonuna tıklayın.`
+          `[WARN] Hint: Review instructions or inspect the sample solution.`
         );
       }
 
@@ -224,9 +183,11 @@ export const InteractivePlayground: React.FC = () => {
               <Code2 className="w-5 h-5" />
             </span>
             <div>
-              <h2 className="text-xl font-bold text-white">İnteraktif Spring Boot Kod Yazma Stüdyosu</h2>
+              <h2 className="text-xl font-bold text-white">
+                {language === 'en' ? 'Interactive Spring Boot Code Studio' : 'İnteraktif Spring Boot Kod Yazma Stüdyosu'}
+              </h2>
               <p className="text-xs text-slate-400 mt-0.5">
-                Kodunuzu doğrudan düzenleyin, derleme kurallarını test edin ve sanal veya Docker ortamında çalıştırın.
+                {language === 'en' ? 'Edit Java 21 code, run validation tests, and test live Spring Boot components.' : 'Kodunuzu doğrudan düzenleyin, derleme kurallarını test edin ve sanal veya Docker ortamında çalıştırın.'}
               </p>
             </div>
           </div>
@@ -243,7 +204,7 @@ export const InteractivePlayground: React.FC = () => {
             }`}
           >
             <Cpu className="w-3.5 h-3.5" />
-            <span>Tarayıcı AST Motoru (Aktif)</span>
+            <span>{t.playground.browserActive}</span>
           </button>
 
           <button
@@ -258,251 +219,242 @@ export const InteractivePlayground: React.FC = () => {
             }`}
           >
             <Server className="w-3.5 h-3.5" />
-            <span>Canlı Docker JVM</span>
-            <span className={`w-2 h-2 rounded-full ${isDockerBackendOnline ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`} />
+            <span>{t.playground.dockerActive}</span>
           </button>
         </div>
       </div>
 
-      {/* Docker Offline Information Card (If user selects Docker mode and container is offline) */}
+      {/* Docker Fallback Alert Banner */}
       {executionEngine === 'docker-jvm' && !isDockerBackendOnline && (
-        <div className="p-5 rounded-2xl bg-gradient-to-r from-blue-950/40 via-slate-900 to-slate-950 border border-blue-500/30 space-y-3 animate-in fade-in duration-200">
+        <div className="p-4 rounded-2xl bg-amber-950/30 border border-amber-500/30 space-y-3 animate-in fade-in">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2 text-blue-300 font-bold text-sm">
-              <AlertTriangle className="w-4 h-4 text-amber-400" />
-              <span>Yerel Docker Spring Boot Sunucusu Tespit Edilemedi (localhost:8080)</span>
+            <div className="flex items-center gap-2 text-amber-400 text-xs font-bold">
+              <AlertTriangle className="w-4 h-4" />
+              <span>{t.docker.inactiveTitle}</span>
             </div>
             <button
               onClick={checkDockerBackendHealth}
               disabled={isCheckingBackend}
-              className="text-xs px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 font-mono transition-colors"
+              className="text-xs px-2.5 py-1 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 rounded-lg border border-amber-500/30 transition-colors"
             >
-              {isCheckingBackend ? 'Kontrol Ediliyor...' : 'Yeniden Dene'}
+              {isCheckingBackend ? 'Kontrol ediliyor...' : t.docker.checkBtn}
             </button>
           </div>
-
           <p className="text-xs text-slate-300 leading-relaxed">
-            Statik web ortamında (Netlify/GitHub Pages) doğrudan Java JVM bayt kodu derleyicisi çalışmaz. Gerçek bir <strong>Java 21 JVM</strong> ve <strong>PostgreSQL 16</strong> üzerinde çalıştırmak için projeyi Docker Compose ile tek komutta başlatabilirsiniz:
+            {t.docker.inactiveDesc}
           </p>
-
-          <div className="flex items-center justify-between p-3 rounded-xl bg-slate-950 border border-slate-800 font-mono text-xs text-emerald-300">
-            <span className="truncate mr-2 select-all">
-              git clone https://github.com/r4venward/springboot.git && cd springboot && docker compose up --build -d
-            </span>
+          <div className="flex items-center gap-2">
             <button
               onClick={handleCopyDockerCommand}
-              className="flex items-center gap-1 px-3 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs shrink-0 transition-colors"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-700 text-xs font-mono font-semibold transition-all"
             >
-              {copiedDockerCmd ? (
-                <>
-                  <Check className="w-3.5 h-3.5 text-emerald-400" />
-                  <span className="text-emerald-400 font-bold">Kopyalandı!</span>
-                </>
-              ) : (
-                <>
-                  <Copy className="w-3.5 h-3.5" />
-                  <span>Komutu Kopyala</span>
-                </>
-              )}
+              {copiedDockerCmd ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+              <span>{copiedDockerCmd ? t.docker.copied : t.docker.copyBtn}</span>
             </button>
-          </div>
-
-          <div className="flex items-center justify-between text-[11px] text-slate-400 pt-1">
-            <span>
-              Tarayıcıda pratik yapmaya devam etmek için <strong className="text-emerald-400">Tarayıcı AST Motoru</strong> otomatik olarak devrededir.
-            </span>
           </div>
         </div>
       )}
 
-      {/* Challenge Selector Tabs */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
-        {CODING_CHALLENGES.map((ch, idx) => {
-          const isSelected = ch.id === selectedChallenge.id;
-          return (
-            <button
-              key={ch.id}
-              onClick={() => handleSelectChallenge(ch)}
-              className={`p-3 rounded-xl border text-left transition-all flex flex-col justify-between gap-1.5 ${
-                isSelected
-                  ? 'bg-emerald-950/50 border-emerald-500 text-emerald-300 ring-2 ring-emerald-500/30 shadow-lg'
-                  : 'bg-slate-950/60 border-slate-800 text-slate-400 hover:bg-slate-800 hover:border-slate-700'
-              }`}
-            >
-              <div className="flex items-center justify-between">
-                <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700">
-                  Görev {idx + 1}
-                </span>
-                <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 font-medium">
-                  {ch.difficulty}
-                </span>
-              </div>
-              <div className="text-xs font-semibold text-white line-clamp-1">{ch.title}</div>
-            </button>
-          );
-        })}
+      {/* Challenge Navigation Pills */}
+      <div className="flex flex-wrap gap-2">
+        {challenges.map((ch, idx) => (
+          <button
+            key={ch.id}
+            onClick={() => handleSelectChallenge(ch.id)}
+            className={`px-3 py-2 rounded-xl text-xs font-semibold transition-all flex items-center gap-2 ${
+              selectedChallenge.id === ch.id
+                ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shadow-sm'
+                : 'bg-slate-950/60 text-slate-400 hover:text-white border border-slate-800'
+            }`}
+          >
+            <span className="w-4 h-4 rounded-full bg-slate-800 flex items-center justify-center text-[10px] font-mono">
+              {idx + 1}
+            </span>
+            <span>{ch.title}</span>
+          </button>
+        ))}
       </div>
 
-      {/* Challenge Instructions Box */}
-      <div className="p-4 rounded-xl bg-slate-950/80 border border-slate-800 space-y-2 text-xs">
+      {/* Problem Description & Requirements Box */}
+      <div className="p-4 sm:p-5 rounded-2xl bg-slate-950/70 border border-slate-800/80 space-y-3">
         <div className="flex items-center justify-between">
-          <span className="font-bold text-emerald-400 flex items-center gap-1.5 uppercase tracking-wider text-[11px]">
-            <Sparkles className="w-3.5 h-3.5" />
-            {selectedChallenge.title}
+          <h3 className="text-sm font-bold text-white flex items-center gap-2">
+            <Sparkles className="w-4 h-4 text-emerald-400" />
+            <span>{t.playground.problemDesc}</span>
+          </h3>
+          <span className="text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-slate-800 text-emerald-400 border border-slate-700">
+            {selectedChallenge.category}
           </span>
-          <span className="text-slate-400 font-mono">{selectedChallenge.category}</span>
         </div>
-        <p className="text-slate-300 leading-relaxed">{selectedChallenge.description}</p>
-        <div className="pt-2 border-t border-slate-800/80">
-          <span className="font-semibold text-slate-400 block mb-1">Yapılması Gerekenler:</span>
-          <ul className="space-y-1 text-slate-300">
-            {selectedChallenge.instructions.map((inst, i) => (
-              <li key={i} className="flex items-start gap-1.5">
-                <span className="text-emerald-400 mt-0.5">•</span>
-                <span>{inst}</span>
+        <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
+          {selectedChallenge.description}
+        </p>
+
+        <div className="space-y-1.5 pt-2 border-t border-slate-800/70">
+          <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">
+            {t.playground.requirements}:
+          </span>
+          <ul className="space-y-1 text-xs text-slate-300">
+            {selectedChallenge.instructions.map((ins, i) => (
+              <li key={i} className="flex items-start gap-2">
+                <span className="text-emerald-400 font-bold">•</span>
+                <span>{ins}</span>
               </li>
             ))}
           </ul>
         </div>
       </div>
 
-      {/* Interactive Code Editor & Live Terminal Split */}
+      {/* Editor & Console Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Left: Code Editor (7 cols) */}
-        <div className="lg:col-span-7 flex flex-col rounded-xl border border-slate-800 bg-slate-950 overflow-hidden shadow-2xl">
-          {/* Editor Header Bar */}
-          <div className="flex items-center justify-between px-4 py-2.5 bg-slate-900 border-b border-slate-800 text-xs">
-            <div className="flex items-center gap-2">
+        {/* Left Column: Code Editor */}
+        <div className="lg:col-span-7 flex flex-col space-y-3">
+          <div className="flex items-center justify-between text-xs px-1">
+            <div className="flex items-center gap-2 text-slate-400 font-mono">
               <FileCode className="w-4 h-4 text-emerald-400" />
-              <span className="font-mono font-bold text-slate-200">{selectedChallenge.filename}</span>
+              <span>{selectedChallenge.filename}</span>
             </div>
 
             <div className="flex items-center gap-2">
               <button
-                onClick={toggleSolution}
-                className="flex items-center gap-1 px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs transition-colors"
-                title="Çözümü Göster/Gizle"
+                onClick={() => setShowSolution(!showSolution)}
+                className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors text-xs font-semibold"
               >
-                {showSolution ? <EyeOff className="w-3 h-3 text-amber-400" /> : <Eye className="w-3 h-3" />}
-                <span>{showSolution ? 'Çözümü Kapat' : 'Çözümü Gör'}</span>
+                {showSolution ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5 text-emerald-400" />}
+                <span>{showSolution ? t.playground.hideHint : t.playground.showHint}</span>
               </button>
 
               <button
                 onClick={handleResetCode}
-                className="p-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition-colors"
-                title="Kodu Sıfırla"
+                className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition-colors"
+                title={t.playground.resetCode}
               >
                 <RotateCcw className="w-3.5 h-3.5" />
-              </button>
-
-              <button
-                onClick={handleRunAndTest}
-                disabled={isCompiling}
-                className="flex items-center gap-1.5 px-3.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-lg shadow-emerald-600/30 transition-all active:scale-95 disabled:opacity-50"
-              >
-                <Play className={`w-3.5 h-3.5 fill-current ${isCompiling ? 'animate-spin' : ''}`} />
-                <span>{isCompiling ? 'Derleniyor...' : 'Çalıştır & Test Et'}</span>
               </button>
             </div>
           </div>
 
-          {/* Editor Textarea with Line Numbers */}
-          <div className="relative flex flex-1 min-h-[380px] p-3 font-mono text-xs leading-6 bg-slate-950">
-            {/* Line Numbers */}
-            <div className="select-none pr-3 text-right text-slate-600 border-r border-slate-800 mr-3 font-mono">
-              {lines.map((_, i) => (
-                <div key={i}>{i + 1}</div>
+          {/* Code Editor Container */}
+          <div className="relative rounded-2xl border border-slate-800 bg-slate-950 overflow-hidden font-mono text-xs shadow-inner min-h-[340px] flex">
+            {/* Line numbers column */}
+            <div className="bg-slate-900/50 select-none py-3.5 px-2.5 text-slate-600 border-r border-slate-800/80 text-right w-10 font-mono text-xs leading-5">
+              {lines.map((_, idx) => (
+                <div key={idx}>{idx + 1}</div>
               ))}
             </div>
 
-            {/* Editable Textarea */}
+            {/* Textarea */}
             <textarea
               ref={textareaRef}
               value={userCode}
               onChange={(e) => setUserCode(e.target.value)}
-              onKeyDown={handleKeyDown}
               spellCheck={false}
-              className="flex-1 bg-transparent text-emerald-300 resize-none focus:outline-none font-mono whitespace-pre leading-6 overflow-x-auto selection:bg-emerald-500/30"
+              className="flex-1 w-full bg-transparent p-3.5 text-slate-100 placeholder-slate-600 focus:outline-none resize-none font-mono text-xs leading-5 selection:bg-emerald-500/30 font-jetbrains"
+              style={{
+                fontFamily: "'JetBrains Mono', monospace",
+                fontFeatureSettings: '"calt" 1, "liga" 1, "zero" 1'
+              }}
             />
           </div>
+
+          {/* Run Action Button */}
+          <button
+            onClick={handleRunCode}
+            disabled={isCompiling}
+            className="flex items-center justify-center gap-2 w-full py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-extrabold text-sm shadow-lg shadow-emerald-500/20 transition-all hover:scale-[1.01] active:scale-[0.99] disabled:opacity-50"
+          >
+            <Play className={`w-4 h-4 fill-slate-950 ${isCompiling ? 'animate-spin' : ''}`} />
+            <span>{isCompiling ? t.playground.runningBtn : t.playground.runBtn}</span>
+          </button>
         </div>
 
-        {/* Right: Live Terminal & Test Assertions (5 cols) */}
-        <div className="lg:col-span-5 flex flex-col space-y-4">
-          {/* Test Checks Results */}
-          <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-2">
-            <span className="text-xs font-bold text-slate-300 uppercase tracking-wider block border-b border-slate-800 pb-1.5">
-              Gerçek Test Denetimleri ({selectedChallenge.testCheckers.length})
-            </span>
-            <div className="space-y-1.5">
-              {selectedChallenge.testCheckers.map((check, idx) => {
-                const isTested = testResults !== null;
-                const passed = isTested ? testResults[idx]?.passed : false;
-
-                return (
-                  <div
-                    key={idx}
-                    className={`p-2 rounded-lg text-xs flex items-start gap-2 border transition-all ${
-                      isTested
-                        ? passed
-                          ? 'bg-emerald-950/40 border-emerald-500/40 text-emerald-300'
-                          : 'bg-red-950/40 border-red-500/40 text-red-300'
-                        : 'bg-slate-900 border-slate-800 text-slate-400'
-                    }`}
-                  >
-                    <div className="mt-0.5 shrink-0">
-                      {isTested ? (
-                        passed ? (
-                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-                        ) : (
-                          <XCircle className="w-3.5 h-3.5 text-red-400" />
-                        )
-                      ) : (
-                        <div className="w-3.5 h-3.5 rounded-full border border-slate-600" />
-                      )}
-                    </div>
-                    <span className="leading-tight">{check.description}</span>
-                  </div>
-                );
-              })}
+        {/* Right Column: Validation & Terminal Logs */}
+        <div className="lg:col-span-5 flex flex-col space-y-3">
+          <div className="flex items-center justify-between text-xs px-1 text-slate-400">
+            <div className="flex items-center gap-2 font-semibold">
+              <Terminal className="w-4 h-4 text-emerald-400" />
+              <span>{t.playground.tabLogs}</span>
             </div>
+            {testResults && (
+              <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${
+                testResults.every((r) => r.passed)
+                  ? 'bg-emerald-500/20 text-emerald-400'
+                  : 'bg-rose-500/20 text-rose-400'
+              }`}>
+                {testResults.filter((r) => r.passed).length}/{testResults.length} {language === 'en' ? 'Passed' : 'Başarılı'}
+              </span>
+            )}
           </div>
 
-          {/* Virtual Spring Boot Terminal */}
-          <div className="flex-1 rounded-xl border border-slate-800 bg-slate-950 flex flex-col overflow-hidden shadow-2xl">
-            <div className="flex items-center justify-between px-3 py-1.5 bg-slate-900 border-b border-slate-800 text-[11px] text-slate-400 font-mono">
-              <div className="flex items-center gap-1.5">
-                <Terminal className="w-3.5 h-3.5 text-emerald-400" />
-                <span>Spring Boot 3.3.4 Virtual Terminal</span>
+          {/* Terminal Box */}
+          <div className="rounded-2xl border border-slate-800 bg-slate-950 p-4 font-mono text-xs text-slate-300 min-h-[340px] max-h-[400px] overflow-y-auto space-y-3 flex flex-col shadow-inner">
+            {/* If no test run yet */}
+            {terminalLogs.length === 0 && (
+              <div className="flex-1 flex flex-col items-center justify-center text-center p-6 text-slate-500 space-y-2">
+                <Terminal className="w-8 h-8 text-slate-600" />
+                <p>{t.playground.emptyTests}</p>
+                <p className="text-[11px] text-slate-600 font-sans">
+                  {language === 'en' ? 'Live output and unit test results will be streamed here.' : 'Canlı loglar ve birim test sonuçları burada akacaktır.'}
+                </p>
               </div>
-              <div className="flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                <span>Port 8080</span>
-              </div>
-            </div>
+            )}
 
-            <div className="p-3 font-mono text-[11px] overflow-y-auto max-h-[220px] space-y-1 text-slate-300">
-              {terminalLogs.length === 0 ? (
-                <div className="text-slate-500 text-center py-8">
-                  Kodunuzu yazıp yukarıdaki <strong className="text-emerald-400">"Çalıştır & Test Et"</strong> butonuna basın.
-                </div>
-              ) : (
-                terminalLogs.map((log, idx) => (
-                  <div key={idx} className="whitespace-pre-wrap leading-tight">
+            {/* Test Results Breakdown */}
+            {testResults && (
+              <div className="space-y-1.5 border-b border-slate-800 pb-3 font-sans">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block mb-1">
+                  {t.playground.tabTests}:
+                </span>
+                {testResults.map((tr, i) => (
+                  <div
+                    key={i}
+                    className={`flex items-start gap-2 p-2 rounded-lg text-xs ${
+                      tr.passed
+                        ? 'bg-emerald-950/40 text-emerald-300 border border-emerald-500/30'
+                        : 'bg-rose-950/40 text-rose-300 border border-rose-500/30'
+                    }`}
+                  >
+                    {tr.passed ? (
+                      <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+                    ) : (
+                      <XCircle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
+                    )}
+                    <span className="leading-snug">{tr.message}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Spring Boot Log lines */}
+            {terminalLogs.length > 0 && (
+              <div className="space-y-1 text-[11px] leading-relaxed">
+                {terminalLogs.map((log, i) => (
+                  <div
+                    key={i}
+                    className={
+                      log.includes('[ERROR]')
+                        ? 'text-rose-400'
+                        : log.includes('TÜM TESTLER') || log.includes('ALL TESTS')
+                        ? 'text-emerald-400 font-bold'
+                        : log.includes(':: Spring Boot ::')
+                        ? 'text-emerald-400'
+                        : 'text-slate-400'
+                    }
+                  >
                     {log}
                   </div>
-                ))
-              )}
-            </div>
+                ))}
+              </div>
+            )}
 
-            {/* Live HTTP Response Viewer */}
+            {/* Simulated HTTP Response JSON */}
             {httpResponse && (
-              <div className="border-t border-slate-800 bg-slate-900/90 p-3 text-xs space-y-1.5">
-                <div className="flex items-center justify-between text-emerald-400 font-mono font-bold text-[11px]">
-                  <span>HTTP/1.1 200 OK</span>
-                  <span>Content-Type: application/json</span>
+              <div className="mt-3 p-3 rounded-xl bg-slate-900 border border-slate-800 space-y-1 font-mono text-[11px]">
+                <div className="flex items-center justify-between text-emerald-400 font-bold text-[10px] uppercase">
+                  <span>HTTP 200 OK Body:</span>
+                  <span>JSON</span>
                 </div>
-                <pre className="text-emerald-300 font-mono text-[11px] bg-slate-950 p-2 rounded border border-slate-800 overflow-x-auto max-h-[100px]">
+                <pre className="text-slate-200 overflow-x-auto">
                   {JSON.stringify(httpResponse, null, 2)}
                 </pre>
               </div>
@@ -510,6 +462,30 @@ export const InteractivePlayground: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Solution Drawer Modal/Box */}
+      {showSolution && (
+        <div className="p-5 rounded-2xl bg-emerald-950/20 border border-emerald-500/40 space-y-3 animate-in fade-in">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
+              <Sparkles className="w-4 h-4" />
+              <span>{t.playground.tabSolution}</span>
+            </span>
+            <button
+              onClick={() => {
+                setUserCode(selectedChallenge.solutionCode);
+                setShowSolution(false);
+              }}
+              className="text-xs px-3 py-1.5 rounded-lg bg-emerald-500 text-slate-950 font-bold hover:bg-emerald-400 transition-colors"
+            >
+              {t.playground.loadSolution}
+            </button>
+          </div>
+          <pre className="p-4 rounded-xl bg-slate-950 border border-slate-800 font-mono text-xs text-slate-200 overflow-x-auto">
+            {selectedChallenge.solutionCode}
+          </pre>
+        </div>
+      )}
     </div>
   );
 };
