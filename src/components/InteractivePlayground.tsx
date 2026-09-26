@@ -47,23 +47,45 @@ export const InteractivePlayground: React.FC = () => {
     try {
       let isUp = false;
 
-      // 1. Direct local port 8080 actuator healthcheck
-      try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 1200);
-        const resDirect = await fetch('http://localhost:8080/actuator/health', {
-          method: 'GET',
-          signal: controller.signal,
-          headers: { 'Accept': 'application/json' }
-        });
-        clearTimeout(timeoutId);
-        if (resDirect.ok) {
-          const data = await resDirect.json();
-          if (data && data.status === 'UP') isUp = true;
-        }
-      } catch {}
+      const configuredApiUrl = (import.meta as any).env?.VITE_API_URL?.replace(/\/$/, '');
 
-      // 2. Relative reverse proxy check
+      // 1. Check custom remote backend URL if provided
+      if (configuredApiUrl) {
+        try {
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 2000);
+          const resConfigured = await fetch(`${configuredApiUrl}/actuator/health`, {
+            method: 'GET',
+            signal: controller.signal,
+            headers: { 'Accept': 'application/json' }
+          });
+          clearTimeout(timeoutId);
+          if (resConfigured.ok) {
+            const data = await resConfigured.json();
+            if (data && data.status === 'UP') isUp = true;
+          }
+        } catch {}
+      }
+
+      // 2. Direct local port 8080 actuator healthcheck
+      if (!isUp) {
+        try {
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 1200);
+          const resDirect = await fetch('http://localhost:8080/actuator/health', {
+            method: 'GET',
+            signal: controller.signal,
+            headers: { 'Accept': 'application/json' }
+          });
+          clearTimeout(timeoutId);
+          if (resDirect.ok) {
+            const data = await resDirect.json();
+            if (data && data.status === 'UP') isUp = true;
+          }
+        } catch {}
+      }
+
+      // 3. Relative reverse proxy check
       if (!isUp) {
         try {
           const controller = new AbortController();

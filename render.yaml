@@ -1,0 +1,29 @@
+services:
+  # 1. Spring Boot 3.3 Reference API Container
+  - type: web
+    name: springboot-reference-api
+    runtime: docker
+    dockerfilePath: ./springboot-reference-app/Dockerfile
+    dockerContext: ./springboot-reference-app
+    plan: free
+    region: frankfurt
+    healthCheckPath: /actuator/health
+    envVars:
+      - key: SPRING_PROFILES_ACTIVE
+        value: docker
+      - key: SPRING_DATASOURCE_URL
+        fromDatabase:
+          name: masterydb
+          property: connectionString
+      - key: SPRING_JPA_HIBERNATE_DDL_AUTO
+        value: update
+      - key: PORT
+        value: 8080
+
+databases:
+  # 2. PostgreSQL 16 Managed Database
+  - name: masterydb
+    plan: free
+    region: frankfurt
+    databaseName: masterydb
+    user: postgres
