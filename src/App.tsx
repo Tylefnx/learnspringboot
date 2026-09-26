@@ -9,6 +9,7 @@ import { PracticePage } from './pages/PracticePage';
 import { GlossaryPage } from './pages/GlossaryPage';
 import { RecipesPage } from './pages/RecipesPage';
 import { QuizPage } from './pages/QuizPage';
+import { VibeCodingPage } from './pages/VibeCodingPage';
 
 export function App() {
   const [activeTab, setActiveTab] = useState<string>('home');
@@ -23,7 +24,7 @@ export function App() {
         const modId = hash.replace('module/', '');
         setSelectedModuleId(modId);
         setActiveTab('lesson-detail');
-      } else if (['home', 'lessons', 'practice', 'glossary', 'recipes', 'quiz'].includes(hash)) {
+      } else if (['home', 'lessons', 'practice', 'recipes', 'vibe-coding', 'glossary', 'quiz'].includes(hash)) {
         setActiveTab(hash);
       }
     };
@@ -71,8 +72,9 @@ export function App() {
           />
         )}
         {activeTab === 'practice' && <PracticePage />}
-        {activeTab === 'glossary' && <GlossaryPage />}
         {activeTab === 'recipes' && <RecipesPage />}
+        {activeTab === 'vibe-coding' && <VibeCodingPage />}
+        {activeTab === 'glossary' && <GlossaryPage />}
         {activeTab === 'quiz' && <QuizPage />}
       </main>
 
@@ -83,6 +85,7 @@ export function App() {
         onClose={() => setIsSearchOpen(false)}
         onSelectLesson={(id) => handleNavigate('lesson-detail', id)}
         onSelectRecipe={() => handleTabChange('recipes')}
+        onSelectVibeCoding={() => handleTabChange('vibe-coding')}
         onGoToQuiz={() => handleTabChange('quiz')}
       />
     </div>

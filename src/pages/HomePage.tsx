@@ -66,6 +66,14 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
               <Code2 className="w-4 h-4 text-emerald-400" />
               <span>{t.hero.btnPractice}</span>
             </button>
+
+            <button
+              onClick={() => onNavigate('vibe-coding')}
+              className="flex items-center gap-2 px-6 py-3 rounded-xl bg-slate-900/90 hover:bg-slate-850 text-emerald-300 font-semibold text-sm border border-emerald-500/30 hover:border-emerald-500/60 shadow-lg shadow-emerald-950/40 transition-all hover:scale-105 active:scale-95"
+            >
+              <Sparkles className="w-4 h-4 text-emerald-400 animate-pulse" />
+              <span>{t.nav.vibeCoding}</span>
+            </button>
           </div>
 
           {/* Feature Badges */}
@@ -129,6 +137,32 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
             <h3 className="text-sm font-bold text-white mb-1">{t.hero.feat4Title}</h3>
             <p className="text-xs text-slate-400 leading-relaxed">{t.hero.feat4Desc}</p>
           </div>
+        </div>
+      </section>
+
+      {/* AI Guardrails & Vibe Coding Teaser Card */}
+      <section className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-slate-900 via-slate-900/90 to-emerald-950/40 border border-emerald-500/30 p-6 sm:p-8 shadow-xl">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+          <div className="space-y-2 max-w-2xl">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+              <Sparkles className="w-3.5 h-3.5" />
+              <span>Yapay Zekâ & Güvenlik Raporu (Vibe Coding)</span>
+            </div>
+            <h2 className="text-xl sm:text-2xl font-black text-white tracking-tight">
+              LLM'lerin Spring Boot Kod Üretimindeki Mimari & Güvenlik Hataları
+            </h2>
+            <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
+              AOP proxy körlüğü (Self-Invocation), BOLA yetkilendirme açıkları, Actuator sızıntıları ve ArchUnit kuralları ile üretim ortamını güvenceye alın.
+            </p>
+          </div>
+
+          <button
+            onClick={() => onNavigate('vibe-coding')}
+            className="flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-bold text-sm shadow-lg shadow-emerald-500/30 transition-all hover:scale-105 active:scale-95 shrink-0"
+          >
+            <span>Raporu & İnteraktif Modülü İncele</span>
+            <ArrowRight className="w-4 h-4" />
+          </button>
         </div>
       </section>
 

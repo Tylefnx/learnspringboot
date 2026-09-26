@@ -8,7 +8,8 @@ import {
   Award, 
   Search, 
   Menu,
-  X
+  X,
+  Sparkles
 } from 'lucide-react';
 import { useLanguage } from '../i18n/LanguageContext';
 
@@ -30,6 +31,7 @@ export const Navbar: React.FC<NavbarProps> = ({
     { id: 'lessons', label: t.nav.modules, icon: BookOpen },
     { id: 'practice', label: t.nav.practice, icon: Code2 },
     { id: 'recipes', label: t.nav.recipes, icon: Terminal },
+    { id: 'vibe-coding', label: t.nav.vibeCoding, icon: Sparkles, isHighlight: true },
     { id: 'glossary', label: t.nav.glossary, icon: BookMarked },
     { id: 'quiz', label: t.nav.quiz, icon: Award },
   ];

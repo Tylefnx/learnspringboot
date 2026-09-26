@@ -30,10 +30,11 @@ export const Footer: React.FC = () => {
           <div>
             <h4 className="font-semibold text-white text-xs uppercase tracking-wider mb-3">Core & Architecture</h4>
             <ul className="space-y-2 text-xs">
-              <li><span className="hover:text-emerald-400 transition-colors">IoC & Dependency Injection</span></li>
-              <li><span className="hover:text-emerald-400 transition-colors">Spring Data JPA & N+1 Fix</span></li>
-              <li><span className="hover:text-emerald-400 transition-colors">Spring Security 6 & JWT Auth</span></li>
-              <li><span className="hover:text-emerald-400 transition-colors">REST API & ProblemDetails</span></li>
+              <li><a href="#vibe-coding" className="hover:text-emerald-400 text-emerald-300 font-semibold transition-colors">✨ Vibe Coding & AI Guardrails</a></li>
+              <li><a href="#module/module-1-spring-boot-basics" className="hover:text-emerald-400 transition-colors">IoC & Dependency Injection</a></li>
+              <li><a href="#module/module-2-spring-data-jpa-hibernate" className="hover:text-emerald-400 transition-colors">Spring Data JPA & N+1 Fix</a></li>
+              <li><a href="#module/module-4-spring-security-jwt" className="hover:text-emerald-400 transition-colors">Spring Security 6 & JWT Auth</a></li>
+              <li><a href="#module/module-3-rest-apis-validation" className="hover:text-emerald-400 transition-colors">REST API & ProblemDetails</a></li>
             </ul>
           </div>
 
