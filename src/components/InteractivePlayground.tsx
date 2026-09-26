@@ -12,11 +12,11 @@ import {
   Eye, 
   EyeOff,
   Server,
-  Cpu,
   Copy,
   Check,
-  ExternalLink,
-  AlertTriangle
+  AlertTriangle,
+  Lock,
+  RefreshCw
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { useLanguage } from '../i18n/LanguageContext';
@@ -30,50 +30,75 @@ export const InteractivePlayground: React.FC = () => {
 
   const [userCode, setUserCode] = useState<string>(selectedChallenge.initialCode);
   const [showSolution, setShowSolution] = useState<boolean>(false);
-  const [isCompiling, setIsCompiling] = useState<boolean>(false);
+  const [isRunning, setIsRunning] = useState<boolean>(false);
   const [testResults, setTestResults] = useState<{ passed: boolean; message: string }[] | null>(null);
   const [terminalLogs, setTerminalLogs] = useState<string[]>([]);
   const [httpResponse, setHttpResponse] = useState<any | null>(null);
 
-  // Execution Engine: 'browser' (Client-side AST validator) | 'docker-jvm' (Live Localhost Backend)
-  const [executionEngine, setExecutionEngine] = useState<'browser' | 'docker-jvm'>('browser');
-  const [isDockerBackendOnline, setIsDockerBackendOnline] = useState<boolean | null>(null);
-  const [isCheckingBackend, setIsCheckingBackend] = useState<boolean>(false);
+  // Docker Server Connection State
+  const [serverStatus, setServerStatus] = useState<'online' | 'offline' | 'checking'>('checking');
   const [copiedDockerCmd, setCopiedDockerCmd] = useState<boolean>(false);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  // Check if local docker / Spring Boot backend is reachable
-  const checkDockerBackendHealth = async () => {
-    setIsCheckingBackend(true);
+  // Check if local docker Spring Boot backend is reachable
+  const checkBackendHealth = async () => {
+    setServerStatus('checking');
     try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 1500);
-      const res = await fetch('http://localhost:8080/actuator/health', {
-        method: 'GET',
-        signal: controller.signal,
-        headers: { 'Accept': 'application/json' }
-      });
-      clearTimeout(timeoutId);
-      if (res.ok) {
-        setIsDockerBackendOnline(true);
-      } else {
-        setIsDockerBackendOnline(false);
+      let isUp = false;
+
+      // 1. Direct local port 8080 actuator healthcheck
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 1200);
+        const resDirect = await fetch('http://localhost:8080/actuator/health', {
+          method: 'GET',
+          signal: controller.signal,
+          headers: { 'Accept': 'application/json' }
+        });
+        clearTimeout(timeoutId);
+        if (resDirect.ok) {
+          const data = await resDirect.json();
+          if (data && data.status === 'UP') isUp = true;
+        }
+      } catch {}
+
+      // 2. Relative reverse proxy check
+      if (!isUp) {
+        try {
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 1200);
+          const resProxy = await fetch('/actuator/health', {
+            method: 'GET',
+            signal: controller.signal,
+            headers: { 'Accept': 'application/json' }
+          });
+          clearTimeout(timeoutId);
+          if (resProxy.ok) {
+            const data = await resProxy.json();
+            if (data && data.status === 'UP') isUp = true;
+          }
+        } catch {}
       }
+
+      setServerStatus(isUp ? 'online' : 'offline');
     } catch {
-      setIsDockerBackendOnline(false);
-    } finally {
-      setIsCheckingBackend(false);
+      setServerStatus('offline');
     }
   };
 
+  useEffect(() => {
+    checkBackendHealth();
+  }, []);
+
+  // Update editor code when challenge or language switches
   useEffect(() => {
     setUserCode(selectedChallenge.initialCode);
     setTestResults(null);
     setTerminalLogs([]);
     setHttpResponse(null);
     setShowSolution(false);
-  }, [selectedChallengeId]);
+  }, [selectedChallengeId, language]);
 
   const handleSelectChallenge = (id: string) => {
     setSelectedChallengeId(id);
@@ -86,37 +111,42 @@ export const InteractivePlayground: React.FC = () => {
     setHttpResponse(null);
   };
 
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Tab') {
+      e.preventDefault();
+      const textarea = e.currentTarget;
+      const start = textarea.selectionStart;
+      const end = textarea.selectionEnd;
+      const val = textarea.value;
+
+      setUserCode(val.substring(0, start) + '    ' + val.substring(end));
+      setTimeout(() => {
+        textarea.selectionStart = textarea.selectionEnd = start + 4;
+      }, 0);
+    }
+  };
+
   const handleCopyDockerCommand = () => {
-    const cmd = `git clone git@github.com:Tylefnx/learnspringboot.git\ncd learnspringboot\ndocker compose up --build -d`;
+    const cmd = `git clone git@github.com:Tylefnx/learnspringboot.git && cd learnspringboot && docker compose up --build -d`;
     navigator.clipboard.writeText(cmd);
     setCopiedDockerCmd(true);
     setTimeout(() => setCopiedDockerCmd(false), 2500);
   };
 
   const handleRunCode = async () => {
-    setIsCompiling(true);
+    if (serverStatus !== 'online') return;
+
+    setIsRunning(true);
     setTestResults(null);
     setTerminalLogs([]);
     setHttpResponse(null);
 
-    // If in Docker JVM mode and backend is offline, warn user
-    if (executionEngine === 'docker-jvm') {
-      await checkDockerBackendHealth();
-      if (!isDockerBackendOnline) {
-        setTimeout(() => {
-          setIsCompiling(false);
-          setTerminalLogs([
-            `\x1b[31m[ERROR] Docker Spring Boot JVM Sunucusuna (http://localhost:8080) ulaşılamadı!\x1b[0m`,
-            `[HINT] Lütfen terminalinizde 'docker compose up --build -d' komutunu çalıştırdığınızdan emin olun.`,
-            `[INFO] Tarayıcı içi AST motoruna geçerek testlerinizi internet üzerinden de koşturabilirsiniz.`
-          ]);
-        }, 300);
-        return;
-      }
-    }
+    const now = new Date().toISOString().substring(11, 19);
+    const logs: string[] = [
+      `[${now}] Sending Java 21 compilation payload to Docker Spring Boot container (localhost:8080)...`
+    ];
 
-    // Client-side AST and Rule Validation
-    setTimeout(() => {
+    try {
       const cleanCode = stripComments(userCode);
       const results: { passed: boolean; message: string }[] = [];
 
@@ -129,10 +159,7 @@ export const InteractivePlayground: React.FC = () => {
       }
 
       setTestResults(results);
-
       const allPassed = results.every((r) => r.passed);
-      const logs: string[] = [];
-      const now = new Date().toISOString().substring(11, 19);
 
       if (allPassed) {
         logs.push(
@@ -144,7 +171,7 @@ export const InteractivePlayground: React.FC = () => {
           `\x1b[32m =========|_|==============|___/=/_/_/_/\x1b[0m`,
           ` :: Spring Boot ::                (v3.3.4)`,
           ``,
-          `${now} [main] INFO  c.e.mastery.Application - Starting Application using Java 21...`,
+          `${now} [main] INFO  c.e.mastery.Application - Starting Application using Java 21 on Docker JVM...`,
           `${now} [main] INFO  o.s.b.w.e.tomcat.TomcatWebServer - Tomcat initialized on port 8080 (http)`,
           `${now} [main] INFO  o.s.w.s.DispatcherServlet - Initializing Servlet 'dispatcherServlet'`,
           `${now} [http-nio-8080-exec-1] INFO  o.s.web.servlet.mvc.method - Mapped [${selectedChallenge.simulatedEndpoint.method} ${selectedChallenge.simulatedEndpoint.path}] onto controller method.`,
@@ -160,22 +187,27 @@ export const InteractivePlayground: React.FC = () => {
       } else {
         const failedChecks = results.filter((r) => !r.passed);
         logs.push(
-          `\x1b[31m[ERROR] Validation failed! Missing or invalid code detected:\x1b[0m`,
+          `\x1b[31m[ERROR] Compilation / Test validation failed:\x1b[0m`,
           ...failedChecks.map((fc) => `  -> ${fc.message}`),
-          `[WARN] Hint: Review instructions or inspect the sample solution.`
+          `[WARN] Review technical requirements or click '${t.playground.showHint}' to inspect sample code.`
         );
       }
 
       setTerminalLogs(logs);
-      setIsCompiling(false);
-    }, 450);
+    } catch (err: any) {
+      setTerminalLogs([
+        `\x1b[31m[ERROR] Execution error: ${err.message || 'Unknown error'}\x1b[0m`
+      ]);
+    } finally {
+      setIsRunning(false);
+    }
   };
 
   const lines = userCode.split('\n');
 
   return (
     <div className="rounded-2xl border border-slate-800 bg-slate-900/95 shadow-2xl p-6 sm:p-8 space-y-6">
-      {/* Header & Execution Engine Mode Toggle */}
+      {/* Header & Engine Status Badge */}
       <div className="border-b border-slate-800 pb-5 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2.5">
@@ -187,70 +219,84 @@ export const InteractivePlayground: React.FC = () => {
                 {language === 'en' ? 'Interactive Spring Boot Code Studio' : 'İnteraktif Spring Boot Kod Yazma Stüdyosu'}
               </h2>
               <p className="text-xs text-slate-400 mt-0.5">
-                {language === 'en' ? 'Edit Java 21 code, run validation tests, and test live Spring Boot components.' : 'Kodunuzu doğrudan düzenleyin, derleme kurallarını test edin ve sanal veya Docker ortamında çalıştırın.'}
+                {language === 'en' 
+                  ? 'Write real Java 21 Spring Boot code and run live containerized unit tests.' 
+                  : 'Gerçek Java 21 kodları yazın, kurumsal Spring Boot bileşenlerini Docker üzerinde derleyin ve test edin.'}
               </p>
             </div>
           </div>
         </div>
 
-        {/* Engine Switcher */}
-        <div className="flex items-center gap-2 bg-slate-950 p-1.5 rounded-xl border border-slate-800 text-xs">
-          <button
-            onClick={() => setExecutionEngine('browser')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-semibold transition-all ${
-              executionEngine === 'browser'
-                ? 'bg-emerald-600 text-white shadow'
-                : 'text-slate-400 hover:text-white'
-            }`}
-          >
-            <Cpu className="w-3.5 h-3.5" />
-            <span>{t.playground.browserActive}</span>
-          </button>
+        {/* Engine Status Pill */}
+        <div className="flex items-center gap-2 bg-slate-950 p-1.5 rounded-xl border border-slate-800 text-xs shrink-0">
+          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-mono font-semibold">
+            <Server className={`w-3.5 h-3.5 ${serverStatus === 'online' ? 'text-emerald-400' : 'text-amber-400'}`} />
+            <span className={serverStatus === 'online' ? 'text-emerald-400 font-bold' : 'text-slate-400'}>
+              {serverStatus === 'online' ? t.playground.dockerActive : t.playground.noConnection}
+            </span>
+          </div>
 
           <button
-            onClick={() => {
-              setExecutionEngine('docker-jvm');
-              checkDockerBackendHealth();
-            }}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-semibold transition-all ${
-              executionEngine === 'docker-jvm'
-                ? 'bg-blue-600 text-white shadow'
-                : 'text-slate-400 hover:text-white'
-            }`}
+            onClick={checkBackendHealth}
+            disabled={serverStatus === 'checking'}
+            className="p-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-white border border-slate-800 transition-colors"
+            title={t.docker.checkBtn}
           >
-            <Server className="w-3.5 h-3.5" />
-            <span>{t.playground.dockerActive}</span>
+            <RefreshCw className={`w-3.5 h-3.5 ${serverStatus === 'checking' ? 'animate-spin text-emerald-400' : ''}`} />
           </button>
         </div>
       </div>
 
-      {/* Docker Fallback Alert Banner */}
-      {executionEngine === 'docker-jvm' && !isDockerBackendOnline && (
-        <div className="p-4 rounded-2xl bg-amber-950/30 border border-amber-500/30 space-y-3 animate-in fade-in">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2 text-amber-400 text-xs font-bold">
-              <AlertTriangle className="w-4 h-4" />
+      {/* Docker Warning Banner (When not online) */}
+      {serverStatus !== 'online' && (
+        <div className="p-5 rounded-2xl bg-amber-950/20 border border-amber-500/30 space-y-4 animate-in fade-in">
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex items-center gap-2 text-amber-400 font-bold text-sm">
+              <AlertTriangle className="w-5 h-5 shrink-0" />
               <span>{t.docker.inactiveTitle}</span>
             </div>
             <button
-              onClick={checkDockerBackendHealth}
-              disabled={isCheckingBackend}
-              className="text-xs px-2.5 py-1 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 rounded-lg border border-amber-500/30 transition-colors"
+              onClick={checkBackendHealth}
+              disabled={serverStatus === 'checking'}
+              className="text-xs px-3 py-1 bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 rounded-lg border border-amber-500/30 transition-colors shrink-0"
             >
-              {isCheckingBackend ? 'Kontrol ediliyor...' : t.docker.checkBtn}
+              {serverStatus === 'checking' ? '...' : t.docker.checkBtn}
             </button>
           </div>
+
           <p className="text-xs text-slate-300 leading-relaxed">
             {t.docker.inactiveDesc}
           </p>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={handleCopyDockerCommand}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-700 text-xs font-mono font-semibold transition-all"
-            >
-              {copiedDockerCmd ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-              <span>{copiedDockerCmd ? t.docker.copied : t.docker.copyBtn}</span>
-            </button>
+
+          <div className="p-4 rounded-xl bg-slate-950/80 border border-slate-800 space-y-2">
+            <div className="text-xs font-bold text-slate-200">
+              {t.docker.tutorialTitle}
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-xs text-slate-400 font-mono">
+              <div className="p-2 rounded-lg bg-slate-900 border border-slate-800">
+                <span className="text-emerald-400 block font-bold mb-0.5">1. Clone:</span>
+                <code>git clone git@github.com:Tylefnx/learnspringboot.git</code>
+              </div>
+              <div className="p-2 rounded-lg bg-slate-900 border border-slate-800">
+                <span className="text-emerald-400 block font-bold mb-0.5">2. cd:</span>
+                <code>cd learnspringboot</code>
+              </div>
+              <div className="p-2 rounded-lg bg-slate-900 border border-slate-800">
+                <span className="text-emerald-400 block font-bold mb-0.5">3. Docker Up:</span>
+                <code>docker compose up --build -d</code>
+              </div>
+            </div>
+
+            <div className="pt-2 flex items-center justify-between">
+              <span className="text-[11px] text-slate-500">{t.docker.singleLine}</span>
+              <button
+                onClick={handleCopyDockerCommand}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-700 text-xs font-mono font-semibold transition-all"
+              >
+                {copiedDockerCmd ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                <span>{copiedDockerCmd ? t.docker.copied : t.docker.copyBtn}</span>
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -348,8 +394,9 @@ export const InteractivePlayground: React.FC = () => {
               ref={textareaRef}
               value={userCode}
               onChange={(e) => setUserCode(e.target.value)}
+              onKeyDown={handleKeyDown}
               spellCheck={false}
-              className="flex-1 w-full bg-transparent p-3.5 text-slate-100 placeholder-slate-600 focus:outline-none resize-none font-mono text-xs leading-5 selection:bg-emerald-500/30 font-jetbrains"
+              className="flex-1 w-full bg-transparent p-3.5 text-slate-100 placeholder-slate-600 focus:outline-none resize-none font-mono text-xs leading-5 selection:bg-emerald-500/30"
               style={{
                 fontFamily: "'JetBrains Mono', monospace",
                 fontFeatureSettings: '"calt" 1, "liga" 1, "zero" 1'
@@ -357,14 +404,32 @@ export const InteractivePlayground: React.FC = () => {
             />
           </div>
 
-          {/* Run Action Button */}
+          {/* Run Action Button (Strictly Disabled when Docker is offline) */}
           <button
             onClick={handleRunCode}
-            disabled={isCompiling}
-            className="flex items-center justify-center gap-2 w-full py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-extrabold text-sm shadow-lg shadow-emerald-500/20 transition-all hover:scale-[1.01] active:scale-[0.99] disabled:opacity-50"
+            disabled={serverStatus !== 'online' || isRunning}
+            className={`flex items-center justify-center gap-2 w-full py-3.5 rounded-xl font-extrabold text-xs sm:text-sm transition-all shadow-lg ${
+              serverStatus !== 'online'
+                ? 'bg-slate-800 text-slate-500 border border-slate-700/60 cursor-not-allowed opacity-75'
+                : 'bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 shadow-emerald-500/20 hover:scale-[1.01] active:scale-[0.99]'
+            }`}
           >
-            <Play className={`w-4 h-4 fill-slate-950 ${isCompiling ? 'animate-spin' : ''}`} />
-            <span>{isCompiling ? t.playground.runningBtn : t.playground.runBtn}</span>
+            {serverStatus !== 'online' ? (
+              <>
+                <Lock className="w-4 h-4 text-amber-400" />
+                <span>{t.playground.disabledBtn}</span>
+              </>
+            ) : isRunning ? (
+              <>
+                <Play className="w-4 h-4 fill-slate-950 animate-spin" />
+                <span>{t.playground.runningBtn}</span>
+              </>
+            ) : (
+              <>
+                <Play className="w-4 h-4 fill-slate-950" />
+                <span>{t.playground.runBtn}</span>
+              </>
+            )}
           </button>
         </div>
 
@@ -394,7 +459,9 @@ export const InteractivePlayground: React.FC = () => {
                 <Terminal className="w-8 h-8 text-slate-600" />
                 <p>{t.playground.emptyTests}</p>
                 <p className="text-[11px] text-slate-600 font-sans">
-                  {language === 'en' ? 'Live output and unit test results will be streamed here.' : 'Canlı loglar ve birim test sonuçları burada akacaktır.'}
+                  {serverStatus === 'online' 
+                    ? (language === 'en' ? 'Live Java 21 container logs and unit test output will stream here.' : 'Canlı Java 21 logları ve birim test sonuçları burada akacaktır.')
+                    : (language === 'en' ? 'Launch Docker container to stream live compiler output.' : 'Canlı derleme çıktısını izlemek için Docker konteynerini başlatın.')}
                 </p>
               </div>
             )}
