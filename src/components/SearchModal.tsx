@@ -3,6 +3,7 @@ import { Search, X, BookOpen, Code, HelpCircle, ArrowRight } from 'lucide-react'
 import { LESSONS_DATA } from '../data/lessonsData';
 import { RECIPES_DATA } from '../data/recipesData';
 import { QUIZ_QUESTIONS } from '../data/quizData';
+import { useLanguage } from '../i18n/LanguageContext';
 
 interface SearchModalProps {
   isOpen: boolean;
@@ -21,6 +22,7 @@ export const SearchModal: React.FC<SearchModalProps> = ({
 }) => {
   const [query, setQuery] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
+  const { t } = useLanguage();
 
   useEffect(() => {
     if (isOpen) {
@@ -38,7 +40,6 @@ export const SearchModal: React.FC<SearchModalProps> = ({
       if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
         e.preventDefault();
         if (isOpen) onClose();
-        else onClose(); // triggered by caller
       }
     };
     window.addEventListener('keydown', handleKeyDown);
@@ -88,10 +89,10 @@ export const SearchModal: React.FC<SearchModalProps> = ({
           <input
             ref={inputRef}
             type="text"
-            placeholder="Ders, kod şablonu veya kavram ara (örn: JWT, JPA, N+1, IoC, @Async)..."
+            placeholder={t.search.placeholder}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            className="w-full bg-transparent text-slate-100 placeholder-slate-500 focus:outline-none text-base font-sans"
+            className="w-full bg-transparent text-slate-100 placeholder-slate-500 focus:outline-none text-sm font-sans"
           />
           {query && (
             <button onClick={() => setQuery('')} className="p-1 hover:text-white text-slate-400 mr-1">
@@ -107,15 +108,15 @@ export const SearchModal: React.FC<SearchModalProps> = ({
         <div className="overflow-y-auto p-4 space-y-4">
           {!query && (
             <div className="text-center py-8 text-slate-500 text-sm">
-              <p>Aramak istediğiniz anahtar kelimeyi yazın.</p>
+              <p>{t.search.placeholder}</p>
               <div className="flex flex-wrap justify-center gap-2 mt-3">
-                {['Security & JWT', 'Spring Data JPA', 'N+1 Problemi', 'Docker', '@Valid', 'Bean Scopes'].map((t) => (
+                {['Security & JWT', 'Spring Data JPA', 'N+1 Query Problem', 'Docker', '@Valid', 'Bean Scopes'].map((item) => (
                   <button
-                    key={t}
-                    onClick={() => setQuery(t)}
+                    key={item}
+                    onClick={() => setQuery(item)}
                     className="text-xs px-2.5 py-1 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700/60"
                   >
-                    {t}
+                    {item}
                   </button>
                 ))}
               </div>
@@ -124,8 +125,7 @@ export const SearchModal: React.FC<SearchModalProps> = ({
 
           {query && !hasResults && (
             <div className="text-center py-10 text-slate-500">
-              <p className="text-base font-medium text-slate-400">"{query}" için sonuç bulunamadı</p>
-              <p className="text-xs mt-1">Farklı bir arama terimi deneyin.</p>
+              <p className="text-base font-medium text-slate-400">"{query}" {t.search.noResults}</p>
             </div>
           )}
 
@@ -134,7 +134,7 @@ export const SearchModal: React.FC<SearchModalProps> = ({
             <div>
               <div className="flex items-center gap-2 text-xs font-semibold text-emerald-400 uppercase tracking-wider mb-2">
                 <BookOpen className="w-3.5 h-3.5" />
-                Ders Modülleri ({matchingLessons.length})
+                {t.search.tabModules} ({matchingLessons.length})
               </div>
               <div className="space-y-1.5">
                 {matchingLessons.map((lesson) => (
@@ -164,7 +164,7 @@ export const SearchModal: React.FC<SearchModalProps> = ({
             <div>
               <div className="flex items-center gap-2 text-xs font-semibold text-amber-400 uppercase tracking-wider mb-2">
                 <Code className="w-3.5 h-3.5" />
-                Hazır Kod Şablonları ({matchingRecipes.length})
+                {t.search.tabRecipes} ({matchingRecipes.length})
               </div>
               <div className="space-y-1.5">
                 {matchingRecipes.map((recipe) => (
@@ -196,7 +196,7 @@ export const SearchModal: React.FC<SearchModalProps> = ({
             <div>
               <div className="flex items-center gap-2 text-xs font-semibold text-purple-400 uppercase tracking-wider mb-2">
                 <HelpCircle className="w-3.5 h-3.5" />
-                Quiz Soruları ({matchingQuiz.length})
+                {t.search.tabQuiz} ({matchingQuiz.length})
               </div>
               <div className="space-y-1.5">
                 {matchingQuiz.slice(0, 3).map((q) => (
